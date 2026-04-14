@@ -16,6 +16,23 @@ from issuer.models import AccessLog, Document
 
 
 class PullURIViewTest(TestCase):
+    def test_document_fetch_logs_extra_fields(self):
+        # Set up extra fields on the document
+        self.doc.employee_mobile = "9999999999"
+        self.doc.file_checksum = "abc123"
+        self.doc.save()
+
+        # Fetch the document with a mobile param
+        url = f"/issuer/document/{self.doc.uri}?mobile=8888888888"
+        hmac_sig = "dummyhmac"  # bypassed in test
+        with patch("issuer.views.read_file_bytes", return_value=b"PDFDATA"):
+            with patch("issuer.views.Document.objects.get", return_value=self.doc):
+                response = self.client.get(url, HTTP_X_DIGILOCKER_HMAC=hmac_sig)
+        self.assertEqual(response.status_code, 200)
+        log = AccessLog.objects.latest("id")
+        self.assertEqual(log.requested_mobile, "8888888888")
+        self.assertEqual(log.file_path, self.doc.file_relative_path)
+        self.assertEqual(log.file_checksum, "abc123")
     def setUp(self):
         self.tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
         self.tmp.write(b"%PDF-1.4 test content")

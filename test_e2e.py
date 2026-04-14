@@ -43,14 +43,14 @@ def test_pull_uri():
         f'<?xml version="1.0" encoding="UTF-8"?>'
         f'<PullURIRequest xmlns="http://tempuri.org/" ver="3.0"'
         f' ts="{ts}" txn="e2e-test-001"'
-        f' orgId="in.gov.state.department"'
+        f' orgId="in.nic.ngl.digilocker"'
         f' keyhash="{keyhash}" format="both">'
         f"<DocDetails>"
         f"<DocType>PPO</DocType>"
         f"<DigiLockerId>test-locker-id</DigiLockerId>"
-        f"<FullName>Sunil Kumar</FullName>"
-        f"<DOB>31-12-1990</DOB>"
-        f"<UDF1>PPO123456</UDF1>"
+        f"<FullName>Test User</FullName>"
+        f"<DOB>01-01-1990</DOB>"
+        f"<UDF1>AUTH001</UDF1>"
         f"</DocDetails>"
         f"</PullURIRequest>"
     ).encode()
@@ -87,7 +87,7 @@ def test_pull_uri_no_hmac():
         b'<?xml version="1.0" encoding="UTF-8"?>'
         b'<PullURIRequest xmlns="http://tempuri.org/" ver="3.0"'
         b' ts="2024-01-01T00:00:00+05:30" txn="no-hmac"'
-        b' orgId="in.gov.state.department" keyhash="bad">'
+        b' orgId="in.nic.ngl.digilocker" keyhash="bad">'
         b"<DocDetails><DocType>PPO</DocType>"
         b"<DigiLockerId>x</DigiLockerId>"
         b"<UDF1>PPO123456</UDF1>"
@@ -123,7 +123,7 @@ def test_pull_uri_wrong_doc():
         f'<?xml version="1.0" encoding="UTF-8"?>'
         f'<PullURIRequest xmlns="http://tempuri.org/" ver="3.0"'
         f' ts="{ts}" txn="e2e-test-003"'
-        f' orgId="in.gov.state.department"'
+        f' orgId="in.nic.ngl.digilocker"'
         f' keyhash="{keyhash}" format="both">'
         f"<DocDetails>"
         f"<DocType>PPO</DocType>"
@@ -171,14 +171,14 @@ def test_pull_uri_wrong_identity():
         f'<?xml version="1.0" encoding="UTF-8"?>'
         f'<PullURIRequest xmlns="http://tempuri.org/" ver="3.0"'
         f' ts="{ts}" txn="e2e-test-004"'
-        f' orgId="in.gov.state.department"'
+        f' orgId="in.nic.ngl.digilocker"'
         f' keyhash="{keyhash}" format="both">'
         f"<DocDetails>"
         f"<DocType>PPO</DocType>"
         f"<DigiLockerId>test-locker</DigiLockerId>"
         f"<FullName>Wrong Name</FullName>"
         f"<DOB>31-12-1990</DOB>"
-        f"<UDF1>PPO123456</UDF1>"
+        f"<UDF1>AUTH001</UDF1>"
         f"</DocDetails>"
         f"</PullURIRequest>"
     ).encode()

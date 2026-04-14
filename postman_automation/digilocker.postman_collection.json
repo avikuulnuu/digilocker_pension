@@ -1,0 +1,103 @@
+{
+  "info": {
+    "name": "DigiLocker API E2E",
+    "_postman_id": "digi-locker-e2e-collection",
+    "description": "End-to-end DigiLocker API test collection with HMAC and KeyHash calculation.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Pull URI Request",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/xml" },
+          { "key": "x-digilocker-hmac", "value": "{{hmac}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<PullURIRequest xmlns=\"http://tempuri.org/\" ver=\"3.0\" ts=\"{{timestamp}}\" txn=\"test-txn\" orgId=\"{{issuer_id}}\" keyhash=\"{{keyhash}}\" format=\"both\">\n  <DocDetails>\n    <DocType>{{DocType}}</DocType>\n    <DigiLockerId>dl-test</DigiLockerId>\n    <FullName>{{FullName}}</FullName>\n    <DOB>{{DOB}}</DOB>\n    <UDF1>{{UDF1}}</UDF1>\n  </DocDetails>\n</PullURIRequest>"
+        },
+        "url": {
+          "raw": "{{base_url}}/issuer/pull-uri",
+          "host": ["{{base_url}}"],
+          "path": ["issuer", "pull-uri"]
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const apiKey = pm.environment.get('api_key');",
+              "const issuerId = pm.environment.get('issuer_id');",
+              "if (!apiKey || apiKey === 'YOUR_DIGILOCKER_API_KEY') {",
+              "  throw new Error('Set api_key in the DigiLocker Local environment before sending the request.');",
+              "}",
+              "if (!issuerId || issuerId === 'YOUR_DIGILOCKER_ISSUER_ID') {",
+              "  throw new Error('Set issuer_id in the DigiLocker Local environment before sending the request.');",
+              "}",
+              "const timestamp = new Date().toISOString();",
+              "pm.environment.set('timestamp', timestamp);",
+              "const keyhash = CryptoJS.SHA256(apiKey + timestamp).toString(CryptoJS.enc.Hex);",
+              "pm.environment.set('keyhash', keyhash);",
+              "let body = pm.request.body.raw;",
+              "body = pm.variables.replaceIn(body);",
+              "pm.environment.set('request_body', body);",
+              "pm.request.body.update(body);",
+              "const hmac = CryptoJS.HmacSHA256(body, apiKey);",
+              "const hmac_b64 = CryptoJS.enc.Base64.stringify(hmac);",
+              "pm.environment.set('hmac', hmac_b64);"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Extract <URI> from XML response and set as environment variable",
+              "const xml = pm.response.text();",
+              "const match = xml.match(/<URI>(.*?)<\\/URI>/);",
+              "if (match && match[1]) {",
+              "    pm.environment.set('uri', match[1]);",
+              "    console.log('Extracted URI:', match[1]);",
+              "} else {",
+              "    pm.environment.unset('uri');",
+              "    console.warn('No URI found in response.');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fetch Document PDF",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-digilocker-hmac", "value": "{{hmac}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/issuer/document/{{uri}}",
+          "host": ["{{base_url}}"],
+          "path": ["issuer", "document", "{{uri}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// For GET, recompute HMAC if needed (optional, for strict security)",
+              "// You can add logic here if your backend requires HMAC for GET with a body or query."
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ],
+  "event": []
+}

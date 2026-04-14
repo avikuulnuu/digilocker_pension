@@ -1,0 +1,54 @@
+# DigiLocker API Test Raw XML Bodies (for manual copy-paste into Postman)
+
+# Example 1 (Imliakum GPF)
+<?xml version="1.0" encoding="UTF-8"?>
+<PullURIRequest xmlns="http://tempuri.org/" ver="3.0" ts="{{timestamp}}" txn="test-txn" orgId="{{issuer_id}}" keyhash="{{keyhash}}" format="both">
+  <DocDetails>
+    <DocType>GPF</DocType>
+    <DigiLockerId>dl-test</DigiLockerId>
+    <FullName>Imliakum</FullName>
+    <DOB>01-01-1980</DOB>
+    <UDF1>AUTH1001</UDF1>
+  </DocDetails>
+</PullURIRequest>
+
+# Example 2 (Kitwena CPO)
+<?xml version="1.0" encoding="UTF-8"?>
+<PullURIRequest xmlns="http://tempuri.org/" ver="3.0" ts="{{timestamp}}" txn="test-txn" orgId="{{issuer_id}}" keyhash="{{keyhash}}" format="both">
+  <DocDetails>
+    <DocType>CPO</DocType>
+    <DigiLockerId>dl-test</DigiLockerId>
+    <FullName>Kitwena</FullName>
+    <DOB>01-01-1981</DOB>
+    <UDF1>AUTH1002</UDF1>
+  </DocDetails>
+</PullURIRequest>
+
+# Example 3 (Kitwena PPO)
+<?xml version="1.0" encoding="UTF-8"?>
+<PullURIRequest xmlns="http://tempuri.org/" ver="3.0" ts="{{timestamp}}" txn="test-txn" orgId="{{issuer_id}}" keyhash="{{keyhash}}" format="both">
+  <DocDetails>
+    <DocType>PPO</DocType>
+    <DigiLockerId>dl-test</DigiLockerId>
+    <FullName>Kitwena</FullName>
+    <DOB>01-01-1982</DOB>
+    <UDF1>AUTH1003</UDF1>
+  </DocDetails>
+</PullURIRequest>
+
+# Example 4 (Kitwena GPO)
+<?xml version="1.0" encoding="UTF-8"?>
+<PullURIRequest xmlns="http://tempuri.org/" ver="3.0" ts="{{timestamp}}" txn="test-txn" orgId="{{issuer_id}}" keyhash="{{keyhash}}" format="both">
+  <DocDetails>
+    <DocType>GPO</DocType>
+    <DigiLockerId>dl-test</DigiLockerId>
+    <FullName>Kitwena</FullName>
+    <DOB>01-01-1983</DOB>
+    <UDF1>AUTH1004</UDF1>
+  </DocDetails>
+</PullURIRequest>
+
+# Usage:
+# 1. Copy the desired XML block.
+# 2. In Postman, set Body type to 'raw' and 'XML'.
+# 3. Paste the XML and replace {{timestamp}}, {{issuer_id}}, and {{keyhash}} with actual values or Postman variables.

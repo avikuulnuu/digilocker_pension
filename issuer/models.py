@@ -18,16 +18,29 @@ class Document(models.Model):
     # Identity attributes for access-control matching
     employee_name = models.TextField(blank=True, default="")
     employee_dob = models.DateField(null=True, blank=True)
+    employee_gender = models.CharField(max_length=10, blank=True, default="")
+    employee_mobile = models.CharField(max_length=10, blank=True, null=True)
+    ddo_name = models.CharField(max_length=500, blank=True, default="")
+    treasury_name = models.CharField(max_length=255, blank=True, default="")
+    authorization_date = models.CharField(max_length=10, blank=True, default="")
 
     # File metadata
     file_relative_path = models.TextField()
     file_checksum = models.CharField(max_length=64, blank=True, default="")
     file_size_bytes = models.BigIntegerField(null=True, blank=True)
     file_last_checked_at = models.DateTimeField(null=True, blank=True)
+    file_exists = models.BooleanField(default=False)
 
     # State flags
     is_active = models.BooleanField(default=True)
     digilocker_enabled = models.BooleanField(default=True)
+    access_count = models.IntegerField(default=0)
+    last_accessed_at = models.DateTimeField(null=True, blank=True)
+
+    # External references
+    application_number = models.CharField(max_length=50, blank=True, null=True)
+    external_system_id = models.CharField(max_length=100, blank=True, null=True)
+    external_metadata = models.JSONField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -72,6 +85,9 @@ class AccessLog(models.Model):
     txn_id = models.CharField(max_length=100, blank=True, default="")
     digilocker_id = models.CharField(max_length=255, blank=True, default="")
     request_ip = models.GenericIPAddressField(null=True, blank=True)
+    requested_mobile = models.CharField(max_length=10, blank=True, null=True)
+    file_path = models.TextField(blank=True, default="")
+    file_checksum = models.CharField(max_length=64, blank=True, default="")
     user_agent = models.TextField(blank=True, default="")
     response_status = models.SmallIntegerField(default=0)
     error_message = models.TextField(blank=True, default="")
@@ -100,6 +116,13 @@ class IntegrityLog(models.Model):
     calculated_checksum = models.CharField(max_length=64, blank=True, default="")
     file_path = models.TextField(blank=True, default="")
     action_taken = models.CharField(max_length=20, blank=True, default="")
+    authorization_number = models.CharField(max_length=50, blank=True, default="")
+    document_type = models.CharField(max_length=10, blank=True, default="")
+    stored_file_size = models.BigIntegerField(null=True, blank=True)
+    calculated_file_size = models.BigIntegerField(null=True, blank=True)
+    request_ip = models.CharField(max_length=45, blank=True, default="")
+    digilocker_txn = models.CharField(max_length=100, blank=True, default="")
+    digilocker_id = models.CharField(max_length=255, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

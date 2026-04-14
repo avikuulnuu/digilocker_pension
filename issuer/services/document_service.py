@@ -81,8 +81,15 @@ def _build_metadata_xml(doc: Document) -> str:
         f'<?xml version="1.0" encoding="UTF-8"?>'
         f"<CertificateData>"
         f"<Name>{doc.employee_name or ''}</Name>"
+        f"<Gender>{doc.employee_gender or ''}</Gender>"
+        f"<Mobile>{doc.employee_mobile or ''}</Mobile>"
         f"<DOB>{dob_str}</DOB>"
         f"<AuthorizationNumber>{doc.authorization_number}</AuthorizationNumber>"
+        f"<AuthorizationDate>{doc.authorization_date or ''}</AuthorizationDate>"
         f"<DocumentType>{doc.document_type}</DocumentType>"
+        f"<DDOName>{doc.ddo_name or ''}</DDOName>"
+        f"<TreasuryName>{doc.treasury_name or ''}</TreasuryName>"
+        f"<ApplicationNumber>{doc.application_number or ''}</ApplicationNumber>"
+        f"<ExternalSystemId>{doc.external_system_id or ''}</ExternalSystemId>"
         f"</CertificateData>"
     )

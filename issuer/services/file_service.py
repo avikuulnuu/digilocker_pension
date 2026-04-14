@@ -39,7 +39,7 @@ def compute_checksum(file_path: str) -> str:
     return sha.hexdigest()
 
 
-def read_file_bytes(doc: Document) -> bytes:
+def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digilocker_id=None) -> bytes:
     """Read document file, performing integrity checks per configured mode.
 
     Returns file content bytes on success.
@@ -50,7 +50,14 @@ def read_file_bytes(doc: Document) -> bytes:
 
     # Check existence
     if not os.path.isfile(full_path):
-        _log_integrity(doc, full_path, "FILE_MISSING", "", "", mode)
+        _log_integrity(
+            doc, full_path, "FILE_MISSING", "", "", mode,
+            extra_context={
+                "request_ip": request_ip,
+                "digilocker_txn": digilocker_txn,
+                "digilocker_id": digilocker_id,
+            }
+        )
         raise FileNotAvailableError(f"File not found: {doc.file_relative_path}")
 
     # Check size limit
@@ -72,6 +79,13 @@ def read_file_bytes(doc: Document) -> bytes:
             action = _log_integrity(
                 doc, full_path, "CHECKSUM_MISMATCH",
                 doc.file_checksum, calculated, mode,
+                extra_context={
+                    "stored_file_size": file_size,
+                    "calculated_file_size": file_size,
+                    "request_ip": request_ip,
+                    "digilocker_txn": digilocker_txn,
+                    "digilocker_id": digilocker_id,
+                }
             )
             if mode == "STRICT":
                 raise IntegrityCheckError("Document integrity check failed")
@@ -84,9 +98,10 @@ def read_file_bytes(doc: Document) -> bytes:
     return content
 
 
-def _log_integrity(doc, file_path, issue_type, stored, calculated, mode):
+def _log_integrity(doc, file_path, issue_type, stored, calculated, mode, extra_context=None):
     """Record an integrity issue and return the action taken."""
     action = "BLOCKED" if mode == "STRICT" else "SERVED"
+    extra = extra_context or {}
     IntegrityLog.objects.create(
         document=doc,
         issue_type=issue_type,
@@ -94,6 +109,13 @@ def _log_integrity(doc, file_path, issue_type, stored, calculated, mode):
         calculated_checksum=calculated,
         file_path=file_path,
         action_taken=action,
+        authorization_number=getattr(doc, "authorization_number", ""),
+        document_type=getattr(doc, "document_type", ""),
+        stored_file_size=extra.get("stored_file_size"),
+        calculated_file_size=extra.get("calculated_file_size"),
+        request_ip=extra.get("request_ip", ""),
+        digilocker_txn=extra.get("digilocker_txn", ""),
+        digilocker_id=extra.get("digilocker_id", ""),
     )
     logger.warning(
         "Integrity issue: %s for doc %d at %s (action=%s)",

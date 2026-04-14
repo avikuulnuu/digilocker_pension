@@ -145,6 +145,7 @@ def document_fetch_view(request, uri):
     log_data = {
         "request_ip": _get_client_ip(request),
         "user_agent": request.META.get("HTTP_USER_AGENT", ""),
+        "requested_mobile": request.GET.get("mobile"),
     }
 
     try:
@@ -162,6 +163,9 @@ def document_fetch_view(request, uri):
 
         log_data["authorization_number"] = doc.authorization_number
         log_data["document_type"] = doc.document_type
+        log_data["file_path"] = doc.file_relative_path
+        log_data["file_checksum"] = doc.file_checksum
+        log_data["requested_mobile"] = request.GET.get("mobile") or doc.employee_mobile
 
         file_bytes = read_file_bytes(doc)
 
@@ -193,6 +197,9 @@ def _log_access(data: dict, doc, status: int, elapsed_ms: int, error: str = ""):
             digilocker_id=data.get("digilocker_id", ""),
             request_ip=data.get("request_ip"),
             user_agent=data.get("user_agent", ""),
+            requested_mobile=data.get("requested_mobile") or (getattr(doc, "employee_mobile", None) if doc else None),
+            file_path=data.get("file_path") or (getattr(doc, "file_relative_path", "") if doc else ""),
+            file_checksum=data.get("file_checksum") or (getattr(doc, "file_checksum", "") if doc else ""),
             response_status=status,
             error_message=error,
             processing_time_ms=elapsed_ms,
