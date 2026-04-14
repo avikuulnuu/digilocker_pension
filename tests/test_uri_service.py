@@ -14,6 +14,7 @@ class URIServiceTest(TestCase):
         self.doc = Document.objects.create(
             authorization_number="AUTH001",
             document_type="PPO",
+            external_system_id="EXT001",
             employee_name="Test User",
             employee_dob=date(1990, 12, 31),
             file_relative_path="test/doc.pdf",

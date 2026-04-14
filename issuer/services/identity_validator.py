@@ -22,31 +22,21 @@ def _normalize_name(name: str) -> str:
     return name
 
 
-def _parse_dob(dob_str: str):
-    """Parse DD-MM-YYYY date string."""
-    from datetime import datetime
-    try:
-        return datetime.strptime(dob_str, "%d-%m-%Y").date()
-    except (ValueError, TypeError):
-        return None
-
-
 def validate_identity(doc: Document, full_name: str = "", dob: str = "") -> None:
     """Validate requester identity against document owner fields.
 
-    In STRICT mode: at least one identity field must be provided,
-    and all provided fields must match.
-    In LENIENT mode: validation only runs if fields are provided.
+    In STRICT mode: name must be provided and match when stored.
+    In LENIENT mode: name validation only runs if provided.
+
+    DOB is accepted for backward compatibility but is not used for request-time
+    validation because document DOB is now optional in storage and request flow.
     """
     mode = settings.DIGILOCKER_IDENTITY_VALIDATION_MODE
     has_name = bool(full_name.strip())
-    has_dob = bool(dob.strip())
 
-    if mode == "STRICT" and not has_name and not has_dob:
-        logger.info("STRICT mode: no identity fields provided, rejecting")
-        raise IdentityMismatchError(
-            "Identity validation requires at least name or DOB"
-        )
+    if mode == "STRICT" and not has_name:
+        logger.info("STRICT mode: no name provided, rejecting")
+        raise IdentityMismatchError("Identity validation requires name")
 
     # Validate name if provided
     if has_name and doc.employee_name:
@@ -57,11 +47,3 @@ def validate_identity(doc: Document, full_name: str = "", dob: str = "") -> None
             )
             raise IdentityMismatchError("Name does not match document owner")
 
-    # Validate DOB if provided
-    if has_dob and doc.employee_dob:
-        request_dob = _parse_dob(dob)
-        if request_dob is None:
-            raise IdentityMismatchError("Invalid DOB format (expected DD-MM-YYYY)")
-        if request_dob != doc.employee_dob:
-            logger.info("DOB mismatch for doc %d", doc.pk)
-            raise IdentityMismatchError("DOB does not match document owner")

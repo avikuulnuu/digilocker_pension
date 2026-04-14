@@ -8,7 +8,7 @@ class DocumentAdmin(admin.ModelAdmin):
     list_display = (
         "id", "authorization_number", "document_type", "uri",
         "employee_name", "employee_gender", "employee_mobile", "employee_dob",
-        "ddo_name", "treasury_name", "authorization_date",
+        "ddo_name", "treasury_name", "treasury_code", "authorization_date",
         "file_relative_path", "file_exists", "file_checksum", "file_size_bytes",
         "is_active", "digilocker_enabled", "access_count", "last_accessed_at",
         "application_number", "external_system_id", "created_at",

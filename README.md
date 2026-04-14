@@ -209,6 +209,7 @@ Document.objects.get_or_create(
     authorization_number='PPO123456',
     document_type='PPO',
     defaults={
+        'external_system_id': 'EXT-PPO123456',
         'employee_name': 'Sunil Kumar',
         'employee_dob': date(1990, 12, 31),
         'file_relative_path': 'sample_ppo.pdf',
@@ -293,3 +294,26 @@ python manage.py collectstatic --noinput
 ```
 
 Set `DEBUG=False`, configure a strong `SECRET_KEY`, and enforce HTTPS via Nginx.
+
+## Reconstructing a PDF from a Base64 String
+
+This project includes a simple utility to convert a Base64-encoded string into a PDF file.
+
+### Steps
+
+1. Save your Base64 string into a file named `input.txt` (or paste it directly into the script).
+
+2. Run the decoding script:
+
+   ```
+   python decode_pdf.py
+   ```
+
+3. The script will generate a file named `output.pdf` in the same directory.
+
+### Notes
+
+* If the Base64 string includes a prefix such as `data:application/pdf;base64,`, it will be handled automatically.
+* Ensure the Base64 string is complete and not truncated, otherwise the output PDF may be corrupted.
+* The script writes the file in binary mode, which is required for valid PDF reconstruction.
+

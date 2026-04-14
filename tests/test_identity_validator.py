@@ -14,6 +14,7 @@ class IdentityValidatorStrictTest(TestCase):
         self.doc = Document.objects.create(
             authorization_number="AUTH002",
             document_type="PPO",
+            external_system_id="EXT002",
             employee_name="Sunil Kumar",
             employee_dob=date(1990, 12, 31),
             file_relative_path="test/doc.pdf",
@@ -30,12 +31,12 @@ class IdentityValidatorStrictTest(TestCase):
         with self.assertRaises(IdentityMismatchError):
             validate_identity(self.doc, "Wrong Name", "")
 
-    def test_dob_match(self):
-        validate_identity(self.doc, "", "31-12-1990")
-
-    def test_dob_mismatch_raises(self):
+    def test_dob_only_raises_when_name_missing(self):
         with self.assertRaises(IdentityMismatchError):
-            validate_identity(self.doc, "", "01-01-2000")
+            validate_identity(self.doc, "", "31-12-1990")
+
+    def test_dob_is_ignored_when_name_matches(self):
+        validate_identity(self.doc, "Sunil Kumar", "01-01-2000")
 
 
 @override_settings(DIGILOCKER_IDENTITY_VALIDATION_MODE="LENIENT")
@@ -44,6 +45,7 @@ class IdentityValidatorLenientTest(TestCase):
         self.doc = Document.objects.create(
             authorization_number="AUTH003",
             document_type="PPO",
+            external_system_id="EXT003",
             employee_name="Test User",
             employee_dob=date(1990, 12, 31),
             file_relative_path="test/doc.pdf",
@@ -51,3 +53,6 @@ class IdentityValidatorLenientTest(TestCase):
 
     def test_lenient_no_fields_ok(self):
         validate_identity(self.doc, "", "")
+
+    def test_lenient_dob_only_is_ignored(self):
+        validate_identity(self.doc, "", "01-01-2000")

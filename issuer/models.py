@@ -5,7 +5,7 @@ from django.core.validators import RegexValidator
 class Document(models.Model):
     """Core document table — DLTS-compliant identity and storage."""
 
-    authorization_number = models.CharField(max_length=50)
+    authorization_number = models.CharField(max_length=20, unique=True)
     document_type = models.CharField(
         max_length=5,
         validators=[RegexValidator(r"^[A-Za-z]{1,5}$", "1-5 alpha characters only")],
@@ -21,7 +21,8 @@ class Document(models.Model):
     employee_gender = models.CharField(max_length=10, blank=True, default="")
     employee_mobile = models.CharField(max_length=10, blank=True, null=True)
     ddo_name = models.CharField(max_length=500, blank=True, default="")
-    treasury_name = models.CharField(max_length=255, blank=True, default="")
+    treasury_name = models.CharField(max_length=255, blank=True, null=True)
+    treasury_code = models.CharField(max_length=50, blank=True, null=True)
     authorization_date = models.CharField(max_length=10, blank=True, default="")
 
     # File metadata
@@ -39,7 +40,7 @@ class Document(models.Model):
 
     # External references
     application_number = models.CharField(max_length=50, blank=True, null=True)
-    external_system_id = models.CharField(max_length=100, blank=True, null=True)
+    external_system_id = models.CharField(max_length=20, unique=True)
     external_metadata = models.JSONField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -48,10 +49,6 @@ class Document(models.Model):
     class Meta:
         db_table = "documents"
         constraints = [
-            models.UniqueConstraint(
-                fields=["authorization_number", "document_type"],
-                name="uq_documents_business",
-            ),
             models.CheckConstraint(
                 condition=(
                     models.Q(doc_id__isnull=True, uri__isnull=True)

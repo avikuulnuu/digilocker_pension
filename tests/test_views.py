@@ -44,6 +44,7 @@ class PullURIViewTest(TestCase):
         self.doc = Document.objects.create(
             authorization_number="AUTH100",
             document_type="PPO",
+            external_system_id="EXT100",
             employee_name="Sunil Kumar",
             employee_dob=date(1990, 12, 31),
             file_relative_path=rel_path,
@@ -99,6 +100,71 @@ class PullURIViewTest(TestCase):
         self.assertIn(b"<URI>", response.content)
 
         self.assertTrue(AccessLog.objects.filter(txn_id="test-txn").exists())
+
+    def test_pull_uri_success_without_dob(self):
+        ts = timezone.now().isoformat()
+        keyhash = hashlib.sha256(
+            (settings.DIGILOCKER_API_KEY + ts).encode()
+        ).hexdigest()
+
+        body = (
+            f'<?xml version="1.0" encoding="UTF-8"?>'
+            f'<PullURIRequest xmlns="http://tempuri.org/" ver="3.0"'
+            f' ts="{ts}" txn="test-txn-no-dob"'
+            f' orgId="{settings.DIGILOCKER_ISSUER_ID}"'
+            f' keyhash="{keyhash}" format="both">'
+            f"<DocDetails>"
+            f"<DocType>PPO</DocType>"
+            f"<DigiLockerId>dl-test</DigiLockerId>"
+            f"<FullName>Sunil Kumar</FullName>"
+            f"<UDF1>AUTH100</UDF1>"
+            f"</DocDetails>"
+            f"</PullURIRequest>"
+        ).encode()
+
+        hmac_sig = self._make_signed_request(body)
+
+        response = self.client.post(
+            "/issuer/pull-uri",
+            data=body,
+            content_type="application/xml",
+            HTTP_X_DIGILOCKER_HMAC=hmac_sig,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Status="1"', response.content)
+
+    def test_pull_uri_ignores_mismatched_dob(self):
+        ts = timezone.now().isoformat()
+        keyhash = hashlib.sha256(
+            (settings.DIGILOCKER_API_KEY + ts).encode()
+        ).hexdigest()
+
+        body = (
+            f'<?xml version="1.0" encoding="UTF-8"?>'
+            f'<PullURIRequest xmlns="http://tempuri.org/" ver="3.0"'
+            f' ts="{ts}" txn="test-txn-wrong-dob"'
+            f' orgId="{settings.DIGILOCKER_ISSUER_ID}"'
+            f' keyhash="{keyhash}" format="both">'
+            f"<DocDetails>"
+            f"<DocType>PPO</DocType>"
+            f"<DigiLockerId>dl-test</DigiLockerId>"
+            f"<FullName>Sunil Kumar</FullName>"
+            f"<DOB>01-01-2000</DOB>"
+            f"<UDF1>AUTH100</UDF1>"
+            f"</DocDetails>"
+            f"</PullURIRequest>"
+        ).encode()
+
+        hmac_sig = self._make_signed_request(body)
+
+        response = self.client.post(
+            "/issuer/pull-uri",
+            data=body,
+            content_type="application/xml",
+            HTTP_X_DIGILOCKER_HMAC=hmac_sig,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Status="1"', response.content)
 
     def test_pull_uri_no_hmac_returns_401(self):
         body = (

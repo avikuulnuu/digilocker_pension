@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
             name='Document',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('authorization_number', models.CharField(max_length=50)),
+                ('authorization_number', models.CharField(max_length=20)),
                 ('document_type', models.CharField(max_length=5, validators=[django.core.validators.RegexValidator('^[A-Za-z]{1,5}$', '1-5 alpha characters only')])),
                 ('doc_id', models.CharField(blank=True, max_length=10, null=True, unique=True)),
                 ('uri', models.CharField(blank=True, max_length=255, null=True, unique=True)),
