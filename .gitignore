@@ -95,6 +95,10 @@ yarn-error.log*
 *.temp
 *.bak
 
+# Local Postman automation artifacts
+postman_automation/
+digilocker_postman_automation.zip
+
 # Documents storage (keep the directory, ignore contents)
 data/docs/*
 !data/docs/.gitkeep
