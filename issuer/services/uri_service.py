@@ -34,20 +34,20 @@ def ensure_uri(document_id: int) -> str:
     with transaction.atomic():
         doc = Document.objects.select_for_update().get(pk=document_id)
 
-        if doc.uri:
-            return doc.uri
+        if doc.digilocker_uri:
+            return doc.digilocker_uri
 
         # Generate a unique doc_id — retry on collision (extremely unlikely)
         for _ in range(5):
             new_doc_id = _generate_random_doc_id()
-            if not Document.objects.filter(doc_id=new_doc_id).exists():
+            if not Document.objects.filter(digilocker_doc_id=new_doc_id).exists():
                 break
         else:
             raise RuntimeError("Failed to generate unique doc_id after retries")
 
-        doc.doc_id = new_doc_id
-        doc.uri = build_uri(doc.document_type, new_doc_id)
-        doc.save(update_fields=["doc_id", "uri", "updated_at"])
+        doc.digilocker_doc_id = new_doc_id
+        doc.digilocker_uri = build_uri(doc.document_type, new_doc_id)
+        doc.save(update_fields=["digilocker_doc_id", "digilocker_uri", "updated_at"])
 
-        logger.info("Generated URI %s for document %d", doc.uri, doc.pk)
-        return doc.uri
+        logger.info("Generated URI %s for document %d", doc.digilocker_uri, doc.pk)
+        return doc.digilocker_uri

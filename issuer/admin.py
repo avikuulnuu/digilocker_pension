@@ -6,16 +6,16 @@ from issuer.models import AccessLog, Document, IntegrityLog
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
     list_display = (
-        "id", "authorization_number", "document_type", "uri",
+        "id", "authorization_number", "document_type", "digilocker_uri",
         "employee_name", "employee_gender", "employee_mobile", "employee_dob",
         "ddo_name", "treasury_name", "treasury_code", "authorization_date",
-        "file_relative_path", "file_exists", "file_checksum", "file_size_bytes",
+        "file_name", "file_exists", "file_checksum", "file_size_bytes",
         "is_active", "digilocker_enabled", "access_count", "last_accessed_at",
         "application_number", "external_system_id", "created_at",
     )
     list_filter = ("document_type", "is_active", "digilocker_enabled", "employee_gender", "file_exists")
-    search_fields = ("authorization_number", "uri", "employee_name", "employee_mobile", "application_number", "external_system_id")
-    readonly_fields = ("doc_id", "uri", "created_at", "updated_at", "file_size_bytes", "last_accessed_at")
+    search_fields = ("authorization_number", "digilocker_uri", "employee_name", "employee_mobile", "application_number", "external_system_id")
+    readonly_fields = ("digilocker_doc_id", "digilocker_uri", "created_at", "updated_at", "file_size_bytes", "last_accessed_at")
 
 
 @admin.register(AccessLog)

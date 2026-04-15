@@ -14,10 +14,11 @@ class IdentityValidatorStrictTest(TestCase):
         self.doc = Document.objects.create(
             authorization_number="AUTH002",
             document_type="PPO",
-            external_system_id="EXT002",
+            external_system_id=2002,
+            authorization_date="01/01/2024",
             employee_name="Sunil Kumar",
             employee_dob=date(1990, 12, 31),
-            file_relative_path="test/doc.pdf",
+            file_name="test/doc.pdf",
         )
 
     def test_strict_no_fields_raises(self):
@@ -45,10 +46,11 @@ class IdentityValidatorLenientTest(TestCase):
         self.doc = Document.objects.create(
             authorization_number="AUTH003",
             document_type="PPO",
-            external_system_id="EXT003",
+            external_system_id=2003,
+            authorization_date="01/01/2024",
             employee_name="Test User",
             employee_dob=date(1990, 12, 31),
-            file_relative_path="test/doc.pdf",
+            file_name="test/doc.pdf",
         )
 
     def test_lenient_no_fields_ok(self):

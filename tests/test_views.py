@@ -23,7 +23,10 @@ class PullURIViewTest(TestCase):
         self.doc.save()
 
         # Fetch the document with a mobile param
-        url = f"/issuer/document/{self.doc.uri}?mobile=8888888888"
+        self.doc.digilocker_doc_id = "TESTDOC01"
+        self.doc.digilocker_uri = "issuer-PPO-TESTDOC01"
+        self.doc.save(update_fields=["digilocker_doc_id", "digilocker_uri"])
+        url = f"/issuer/document/{self.doc.digilocker_uri}?mobile=8888888888"
         hmac_sig = "dummyhmac"  # bypassed in test
         with patch("issuer.views.read_file_bytes", return_value=b"PDFDATA"):
             with patch("issuer.views.Document.objects.get", return_value=self.doc):
@@ -31,7 +34,7 @@ class PullURIViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         log = AccessLog.objects.latest("id")
         self.assertEqual(log.requested_mobile, "8888888888")
-        self.assertEqual(log.file_path, self.doc.file_relative_path)
+        self.assertEqual(log.file_path, self.doc.file_name)
         self.assertEqual(log.file_checksum, "abc123")
     def setUp(self):
         self.tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
@@ -44,10 +47,11 @@ class PullURIViewTest(TestCase):
         self.doc = Document.objects.create(
             authorization_number="AUTH100",
             document_type="PPO",
-            external_system_id="EXT100",
+            external_system_id=2100,
+            authorization_date="01/01/2024",
             employee_name="Sunil Kumar",
             employee_dob=date(1990, 12, 31),
-            file_relative_path=rel_path,
+            file_name=rel_path,
         )
 
         self._base_path_patcher = patch.object(

@@ -24,7 +24,7 @@ class IntegrityCheckError(Exception):
 
 def resolve_path(doc: Document) -> str:
     """Resolve absolute path from base config + relative path."""
-    return os.path.join(settings.DIGILOCKER_BASE_STORAGE_PATH, doc.file_relative_path)
+    return os.path.join(settings.DIGILOCKER_BASE_STORAGE_PATH, doc.file_name)
 
 
 def compute_checksum(file_path: str) -> str:
@@ -58,7 +58,7 @@ def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digi
                 "digilocker_id": digilocker_id,
             }
         )
-        raise FileNotAvailableError(f"File not found: {doc.file_relative_path}")
+        raise FileNotAvailableError(f"File not found: {doc.file_name}")
 
     # Check size limit
     file_size = os.path.getsize(full_path)

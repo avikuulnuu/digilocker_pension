@@ -14,10 +14,11 @@ class URIServiceTest(TestCase):
         self.doc = Document.objects.create(
             authorization_number="AUTH001",
             document_type="PPO",
-            external_system_id="EXT001",
+            external_system_id=2001,
+            authorization_date="01/01/2024",
             employee_name="Test User",
             employee_dob=date(1990, 12, 31),
-            file_relative_path="test/doc.pdf",
+            file_name="test/doc.pdf",
         )
 
     def test_build_uri_format(self):
@@ -29,5 +30,5 @@ class URIServiceTest(TestCase):
         uri2 = ensure_uri(self.doc.pk)
         self.assertEqual(uri1, uri2)
         self.doc.refresh_from_db()
-        self.assertIsNotNone(self.doc.doc_id)
+        self.assertIsNotNone(self.doc.digilocker_doc_id)
         self.assertTrue(uri1.startswith(settings.DIGILOCKER_ISSUER_ID))
