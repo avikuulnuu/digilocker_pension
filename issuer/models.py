@@ -8,10 +8,7 @@ class Document(models.Model):
     """Core document table — DLTS-compliant identity and storage."""
 
     authorization_number = models.CharField(max_length=20)
-    document_type = models.CharField(
-        max_length=5,
-        validators=[RegexValidator(r"^[A-Za-z]{1,5}$", "1-5 alpha characters only")],
-    )
+    document_type = models.CharField(max_length=30)
 
     # DLTS identifiers — write-once, lazily generated
     digilocker_doc_id = models.CharField(max_length=10, unique=True, null=True, blank=True)
@@ -42,7 +39,7 @@ class Document(models.Model):
 
     # External references
     application_number = models.CharField(max_length=50, blank=True, null=True)
-    external_system_id = models.BigIntegerField(unique=True)
+    external_system_id = models.CharField(max_length=20, unique=True)
     external_metadata = models.JSONField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
