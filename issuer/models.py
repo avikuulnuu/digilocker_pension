@@ -59,10 +59,7 @@ class Document(models.Model):
                 ),
                 name="chk_doc_id_uri_pair",
             ),
-            models.CheckConstraint(
-                condition=models.Q(authorization_date__regex=r"^\d{2}/\d{2}/\d{4}$"),
-                name="chk_authorization_date",
-            ),
+            # Removed authorization_date regex constraint to allow flexible date formats
             models.CheckConstraint(
                 condition=models.Q(access_count__gte=0),
                 name="chk_access_count",
