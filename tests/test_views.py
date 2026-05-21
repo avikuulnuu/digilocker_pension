@@ -48,7 +48,7 @@ class PullURIViewTest(TestCase):
             authorization_number="AUTH100",
             document_type="PPO",
             external_system_id=2100,
-            authorization_date="01/01/2024",
+            authorization_date=date(2024, 1, 1),
             employee_name="Sunil Kumar",
             employee_dob=date(1990, 12, 31),
             file_name=rel_path,

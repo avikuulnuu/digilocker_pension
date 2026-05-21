@@ -15,14 +15,14 @@ class Document(models.Model):
     digilocker_uri = models.CharField(max_length=255, unique=True, null=True, blank=True)
 
     # Identity attributes for access-control matching
-    employee_name = models.TextField()
+    employee_name = models.CharField(max_length=255)
     employee_dob = models.DateField(null=True, blank=True)
     employee_gender = models.CharField(max_length=10, blank=True, default="")
     employee_mobile = models.CharField(max_length=10, blank=True, null=True)
     ddo_name = models.CharField(max_length=500, blank=True, default="")
     treasury_name = models.CharField(max_length=255, blank=True, null=True)
     treasury_code = models.CharField(max_length=50, blank=True, null=True)
-    authorization_date = models.CharField(max_length=10)
+    authorization_date = models.DateField()
 
     # File metadata
     file_name = models.TextField()
@@ -59,7 +59,6 @@ class Document(models.Model):
                 ),
                 name="chk_doc_id_uri_pair",
             ),
-            # Removed authorization_date regex constraint to allow flexible date formats
             models.CheckConstraint(
                 condition=models.Q(access_count__gte=0),
                 name="chk_access_count",
