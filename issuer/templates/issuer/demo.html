@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>DigiLocker — Demo UI</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      .container { display: flex; gap: 24px; }
+      .panel { flex: 1; border: 1px solid #ddd; padding: 16px; border-radius: 6px; }
+      .corner { width: 320px; min-width: 220px; }
+      textarea { width: 100%; height: 220px; font-family: monospace; font-size: 13px; }
+      .small { font-size: 13px; color: #444; }
+      button { margin-top: 8px; }
+      .copy-row { display:flex; gap:8px; align-items:center; }
+    </style>
+  </head>
+  <body>
+    <h1>DigiLocker Issuer — Demo UI</h1>
+    <p class="small">This page simulates creating a PullURI request and shows document fetch URLs you can paste into the DigiLocker test UI.</p>
+
+    <div class="container">
+      <div class="panel">
+        <h3>Example PullURI XML</h3>
+        <textarea id="pullxml">{{ samples.pull_uri_xml }}</textarea>
+        <div class="copy-row">
+          <button onclick="copyToClipboard('pullxml')">Copy PullURI XML</button>
+          <span class="small">HMAC header (set in request): <code>{{ samples.hmac_header }}</code></span>
+        </div>
+      </div>
+
+      <div class="panel corner">
+        <h4>Quick values</h4>
+        <p class="small">Copy these into the DigiLocker test UI:</p>
+        <div style="margin-bottom:8px;"><strong>Fetch URL</strong></div>
+        <textarea id="fetchurl">{{ samples.fetch_url }}</textarea>
+        <div class="copy-row">
+          <button onclick="copyToClipboard('fetchurl')">Copy Fetch URL</button>
+          <button onclick="copyAll()">Copy All</button>
+        </div>
+        <hr/>
+        <p class="small">Notes:</p>
+        <ul class="small">
+          <li>The XML above is a demo; update timestamps and keyhash before sending.</li>
+          <li>Set the HTTP header <code>X-Digilocker-HMAC</code> to the base64 HMAC of the request body.</li>
+          <li>Document fetch URL is shown for demo URIs; replace with generated URI from PullURI response.</li>
+        </ul>
+      </div>
+    </div>
+
+    <script>
+      function copyToClipboard(id) {
+        const el = document.getElementById(id);
+        el.select();
+        document.execCommand('copy');
+        window.getSelection().removeAllRanges();
+        alert('Copied to clipboard');
+      }
+      function copyAll(){
+        const xml = document.getElementById('pullxml').value;
+        const url = document.getElementById('fetchurl').value;
+        const combined = xml + '\n\n' + url;
+        navigator.clipboard.writeText(combined).then(()=>alert('Copied XML + URL'))
+      }
+    </script>
+  </body>
+</html>

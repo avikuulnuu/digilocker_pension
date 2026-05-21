@@ -7,6 +7,7 @@ from django.http import HttpResponse, HttpResponseNotAllowed
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
+from django.shortcuts import render
 
 from issuer.authentication import authenticate_request, AuthenticationError
 from issuer.models import AccessLog, Document
@@ -28,6 +29,30 @@ from issuer.services.response_builder import (
 from issuer.services.xml_parser import XMLParseError, parse_pull_uri_request
 
 logger = logging.getLogger("issuer")
+
+
+def demo_ui(request):
+    """Simple demo page that shows example PullURI requests and fetch URLs."""
+    samples = {
+        "pull_uri_xml": (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<PullURIRequest xmlns="http://tempuri.org/" ver="3.0" '
+            'ts="2026-01-01T00:00:00Z" txn="demo-txn" '
+            'orgId="in.gov.state.department" keyhash="<KEYHASH>" format="both">'
+            '<DocDetails>'
+            '<DocType>PPO</DocType>'
+            '<DigiLockerId>dl-demo</DigiLockerId>'
+            '<FullName>Sunil Kumar</FullName>'
+            '<DOB>31-12-1990</DOB>'
+            '<UDF1>PPO123456</UDF1>'
+            '</DocDetails>'
+            '</PullURIRequest>'
+        ),
+        "fetch_url": "/issuer/document/in.gov.state.department-PPO-EXAMPLE?mobile=9999999999",
+        "hmac_header": "<Base64-HMAC-SIGNATURE>",
+    }
+
+    return render(request, "issuer/demo.html", {"samples": samples})
 
 
 def _get_client_ip(request):
