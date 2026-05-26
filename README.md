@@ -277,6 +277,7 @@ digilocker/
 | `BASE_STORAGE_PATH` | Absolute path to document files | *(required)* |
 | `INTEGRITY_MODE` | `STRICT` or `LOG_AND_SERVE` | `STRICT` |
 | `IDENTITY_VALIDATION_MODE` | `STRICT` or `LENIENT` | `STRICT` |
+| `LENIENT_NAME_MATCH_THRESHOLD` | Min name similarity in LENIENT mode (`0.0`–`1.0`) | `0.70` |
 | `MAX_FILE_SIZE_MB` | Max document size to serve | `10` |
 | `TIMESTAMP_SKEW_SECONDS` | Allowed clock drift | `300` |
 

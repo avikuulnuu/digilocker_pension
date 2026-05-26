@@ -58,3 +58,13 @@ class IdentityValidatorLenientTest(TestCase):
 
     def test_lenient_dob_only_is_ignored(self):
         validate_identity(self.doc, "", "01-01-2000")
+
+    def test_lenient_name_close_match_ok(self):
+        validate_identity(self.doc, "Test Usr", "")
+
+    def test_lenient_name_below_threshold_raises(self):
+        with self.assertRaises(IdentityMismatchError):
+            validate_identity(self.doc, "Completely Different", "")
+
+    def test_lenient_name_exact_match_ok(self):
+        validate_identity(self.doc, "Test User", "")

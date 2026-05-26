@@ -7,6 +7,7 @@ from issuer.models import Document
 from issuer.services.file_service import (
     FileNotAvailableError,
     IntegrityCheckError,
+    effective_file_name,
     find_readable_path,
     read_file_bytes,
     resolve_path,
@@ -44,7 +45,13 @@ def lookup_document(request_data: PullURIRequestData, *, txn: str = "") -> Docum
     diagnostics when the record or stored file cannot be resolved.
     """
     authorization_number = request_data.udfs.get("UDF1", "").strip()
-    doc_type = request_data.doc_type
+    doc_type = (request_data.doc_type or "").strip()
+    logger.info(
+        "pull_doc.lookup: UDF1=%r doc_type=%r txn=%s",
+        authorization_number,
+        doc_type,
+        txn,
+    )
     if not authorization_number:
         _fail_lookup(
             "MISSING_UDF1",
@@ -55,9 +62,25 @@ def lookup_document(request_data: PullURIRequestData, *, txn: str = "") -> Docum
 
     by_auth = Document.objects.filter(authorization_number=authorization_number)
     if not by_auth.exists():
+        message = (
+            f"No document record exists for authorization number '{authorization_number}'"
+        )
+        file_match = Document.objects.filter(file_name=authorization_number).first()
+        if not file_match:
+            effective = effective_file_name(authorization_number)
+            if effective != authorization_number:
+                file_match = Document.objects.filter(file_name=effective).first()
+        if file_match:
+            message = (
+                f"No document with authorization_number '{authorization_number}', but "
+                f"file_name '{file_match.file_name}' exists on document id={file_match.pk} "
+                f"(authorization_number='{file_match.authorization_number}', "
+                f"document_type='{file_match.document_type}'). "
+                f"Pull URI UDF1 must match authorization_number, not file_name."
+            )
         _fail_lookup(
             "AUTH_NOT_FOUND",
-            f"No document record exists for authorization number '{authorization_number}'",
+            message,
             txn=txn,
             doc_type=doc_type,
             authorization_number=authorization_number,
