@@ -87,6 +87,7 @@
           <a href="{% url 'issuer:document-list' %}" class="{% if 'document' in name %}active{% endif %}">Documents</a>
           <a href="{% url 'issuer:accesslog-list' %}" class="{% if 'accesslog' in name %}active{% endif %}">Access Logs</a>
           <a href="{% url 'issuer:integritylog-list' %}" class="{% if 'integritylog' in name %}active{% endif %}">Integrity Logs</a>
+          <a href="{% url 'issuer:decode-pdf-tool' %}" class="{% if 'decode-pdf' in name %}active{% endif %}">Decode PDF</a>
           {% endwith %}
         </nav>
         <div class="sidebar-footer">

@@ -31,4 +31,10 @@ urlpatterns = [
     path("manage/integrity-logs/<int:pk>/", manage_views.integritylog_detail, name="integritylog-detail"),
     path("manage/integrity-logs/<int:pk>/edit/", manage_views.integritylog_update, name="integritylog-update"),
     path("manage/integrity-logs/<int:pk>/delete/", manage_views.integritylog_delete, name="integritylog-delete"),
+    path("manage/tools/decode-pdf/", manage_views.decode_pdf_tool, name="decode-pdf-tool"),
+    path(
+        "manage/tools/decode-pdf/view/<str:token>/",
+        manage_views.decode_pdf_view,
+        name="decode-pdf-view",
+    ),
 ]
