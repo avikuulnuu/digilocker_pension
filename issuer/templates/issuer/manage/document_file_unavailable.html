@@ -1,0 +1,19 @@
+{% extends "issuer/manage/base.html" %}
+{% block title %}File unavailable{% endblock %}
+{% block content %}
+  <h1>Document file unavailable</h1>
+  <p class="sub">Document #{{ object.id }} — {{ object.authorization_number }} / {{ object.document_type }}</p>
+  <div class="panel">
+    <p style="margin:0 0 12px;">The file could not be opened for preview.</p>
+    {% if object.file_name %}
+    <p><strong>Stored file name:</strong> {{ object.file_name }}</p>
+    <p><strong>Expected path:</strong> {{ expected_path }}</p>
+    {% else %}
+    <p>No <code>file_name</code> is stored for this record.</p>
+    {% endif %}
+    <div class="actions" style="margin-top:18px;">
+      <a class="btn" href="{% url 'issuer:document-detail' object.pk %}">Back to details</a>
+      <a class="btn btn-outline" href="{% url 'issuer:document-list' %}">Back to list</a>
+    </div>
+  </div>
+{% endblock %}

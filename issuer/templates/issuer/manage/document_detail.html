@@ -5,9 +5,19 @@
   <p class="sub">{{ object.authorization_number }} / {{ object.document_type }}</p>
   <div class="actions">
     <a class="btn btn-outline" href="{% url 'issuer:document-list' %}">Back to list</a>
+    {% if can_view_file %}
+    <a class="btn btn-secondary" href="{{ file_view_url }}" target="_blank" rel="noopener">View document</a>
+    {% endif %}
     <a class="btn" href="{% url 'issuer:document-update' object.pk %}">Edit</a>
     <a class="btn btn-danger" href="{% url 'issuer:document-delete' object.pk %}">Delete</a>
   </div>
+  {% if not can_view_file %}
+  <div class="panel" style="margin-bottom:24px;background:#fff7ed;border-color:#fed7aa;">
+    <p style="margin:0;font-size:14px;color:#9a3412;">
+      Document file is not available on disk{% if object.file_name %} (expected: {{ object.file_name }}){% else %} — no file_name in database{% endif %}.
+    </p>
+  </div>
+  {% endif %}
   <div class="panel">
     <dl class="detail-grid">
       <dt>ID</dt><dd>{{ object.id }}</dd>

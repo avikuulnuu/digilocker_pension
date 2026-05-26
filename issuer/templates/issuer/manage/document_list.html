@@ -35,7 +35,12 @@
           <td>{{ obj.digilocker_uri|default:"—"|truncatechars:24 }}</td>
           <td>{% if obj.is_active %}Yes{% else %}No{% endif %}</td>
           <td>{{ obj.created_at|date:"Y-m-d H:i" }}</td>
-          <td><a href="{% url 'issuer:document-detail' obj.pk %}">View</a></td>
+          <td>
+            <a href="{% url 'issuer:document-detail' obj.pk %}">Details</a>
+            {% if obj.file_name %}
+            · <a href="{% url 'issuer:document-view-file' obj.pk %}" target="_blank" rel="noopener">Document</a>
+            {% endif %}
+          </td>
         </tr>
         {% empty %}
         <tr><td colspan="8">No documents found.</td></tr>

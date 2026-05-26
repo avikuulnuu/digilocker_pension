@@ -7,6 +7,7 @@ import unicodedata
 from django.conf import settings
 
 from issuer.models import Document
+from issuer.services.pull_doc_log import stage_failed
 
 logger = logging.getLogger("issuer")
 
@@ -35,15 +36,24 @@ def validate_identity(doc: Document, full_name: str = "", dob: str = "") -> None
     has_name = bool(full_name.strip())
 
     if mode == "STRICT" and not has_name:
-        logger.info("STRICT mode: no name provided, rejecting")
+        stage_failed(
+            "identity",
+            "STRICT mode: no name provided",
+            document_id=doc.pk,
+            mode=mode,
+        )
         raise IdentityMismatchError("Identity validation requires name")
 
     # Validate name if provided
     if has_name and doc.employee_name:
         if _normalize_name(full_name) != _normalize_name(doc.employee_name):
-            logger.info(
-                "Name mismatch for doc %d: request=%s stored=%s",
-                doc.pk, full_name, doc.employee_name,
+            stage_failed(
+                "identity",
+                "Name does not match document owner",
+                document_id=doc.pk,
+                request_name=full_name,
+                stored_name=doc.employee_name,
+                mode=mode,
             )
             raise IdentityMismatchError("Name does not match document owner")
 

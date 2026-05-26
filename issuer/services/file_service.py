@@ -8,6 +8,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from issuer.models import Document, IntegrityLog
+from issuer.services.pull_doc_log import stage_failed, stage_ok
 
 logger = logging.getLogger("issuer")
 
@@ -50,6 +51,13 @@ def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digi
 
     # Check existence
     if not os.path.isfile(full_path):
+        stage_failed(
+            "file_read",
+            f"File not found on disk: {doc.file_name}",
+            document_id=doc.pk,
+            path=full_path,
+            digilocker_txn=digilocker_txn,
+        )
         _log_integrity(
             doc, full_path, "FILE_MISSING", "", "", mode,
             extra_context={
@@ -64,6 +72,13 @@ def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digi
     file_size = os.path.getsize(full_path)
     max_bytes = settings.DIGILOCKER_MAX_FILE_SIZE_MB * 1024 * 1024
     if file_size > max_bytes:
+        stage_failed(
+            "file_read",
+            f"File exceeds {settings.DIGILOCKER_MAX_FILE_SIZE_MB}MB limit",
+            document_id=doc.pk,
+            file_size=file_size,
+            max_bytes=max_bytes,
+        )
         raise FileNotAvailableError(
             f"File exceeds {settings.DIGILOCKER_MAX_FILE_SIZE_MB}MB limit"
         )
@@ -87,6 +102,15 @@ def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digi
                     "digilocker_id": digilocker_id,
                 }
             )
+            stage_failed(
+                "integrity",
+                "Checksum mismatch",
+                document_id=doc.pk,
+                stored=doc.file_checksum,
+                calculated=calculated,
+                action=action,
+                mode=mode,
+            )
             if mode == "STRICT":
                 raise IntegrityCheckError("Document integrity check failed")
 
@@ -95,6 +119,14 @@ def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digi
     doc.file_size_bytes = file_size
     doc.save(update_fields=["file_last_checked_at", "file_size_bytes"])
 
+    stage_ok(
+        "file_read",
+        "File read and verified",
+        document_id=doc.pk,
+        file_name=doc.file_name,
+        file_size=file_size,
+        digilocker_txn=digilocker_txn,
+    )
     return content
 
 

@@ -15,6 +15,7 @@ urlpatterns = [
     path("manage/documents/", manage_views.document_list, name="document-list"),
     path("manage/documents/export/", manage_views.document_export, name="document-export"),
     path("manage/documents/new/", manage_views.document_create, name="document-create"),
+    path("manage/documents/<int:pk>/file/", manage_views.document_view_file, name="document-view-file"),
     path("manage/documents/<int:pk>/", manage_views.document_detail, name="document-detail"),
     path("manage/documents/<int:pk>/edit/", manage_views.document_update, name="document-update"),
     path("manage/documents/<int:pk>/delete/", manage_views.document_delete, name="document-delete"),
