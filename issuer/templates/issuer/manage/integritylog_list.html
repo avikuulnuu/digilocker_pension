@@ -4,14 +4,71 @@
   <h1>Integrity Logs</h1>
   <p class="sub">All records in integrity_logs.</p>
   <div class="panel">
-    <div class="toolbar">
-      <form method="get">
-        <input type="text" name="q" value="{{ q }}" placeholder="Search issue, auth, txn…" />
-        <button type="submit" class="btn">Search</button>
-      </form>
-      <a class="btn" href="{% url 'issuer:integritylog-create' %}">Create</a>
-      <a class="btn btn-secondary" href="{{ export_url }}">Download report (CSV)</a>
-    </div>
+    <form method="get" class="filter-panel">
+      <h2>Filters</h2>
+      <div class="filter-grid">
+        <div class="filter-field">
+          <label for="f_q">Quick search</label>
+          <input id="f_q" type="text" name="q" value="{{ filters.q }}" placeholder="Issue, auth, txn, path…" />
+        </div>
+        <div class="filter-field">
+          <label for="f_issue">Issue type</label>
+          <select id="f_issue" name="issue_type">
+            <option value="">All issues</option>
+            {% for t in issue_types %}
+            <option value="{{ t }}" {% if filters.issue_type == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="f_action">Action taken</label>
+          <select id="f_action" name="action_taken">
+            <option value="">All actions</option>
+            {% for a in actions %}
+            <option value="{{ a }}" {% if filters.action_taken == a %}selected{% endif %}>{{ a }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="f_auth">Authorization number</label>
+          <input id="f_auth" type="text" name="authorization_number" value="{{ filters.authorization_number }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_type">Document type</label>
+          <select id="f_type" name="document_type">
+            <option value="">All types</option>
+            {% for t in document_types %}
+            <option value="{{ t }}" {% if filters.document_type == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="f_doc">Document ID</label>
+          <input id="f_doc" type="number" name="document_id" value="{{ filters.document_id }}" min="1" />
+        </div>
+        <div class="filter-field">
+          <label for="f_txn">DigiLocker txn</label>
+          <input id="f_txn" type="text" name="digilocker_txn" value="{{ filters.digilocker_txn }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_ip">Request IP</label>
+          <input id="f_ip" type="text" name="request_ip" value="{{ filters.request_ip }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_from">Created from</label>
+          <input id="f_from" type="date" name="created_from" value="{{ filters.created_from }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_to">Created to</label>
+          <input id="f_to" type="date" name="created_to" value="{{ filters.created_to }}" />
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button type="submit" class="btn">Apply filters</button>
+        <a class="btn btn-outline" href="{{ clear_url }}">Clear</a>
+        <a class="btn btn-secondary" href="{{ export_url }}">Download CSV</a>
+      </div>
+    </form>
     <table>
       <thead>
         <tr>
@@ -38,7 +95,7 @@
           <td><a href="{% url 'issuer:integritylog-detail' obj.pk %}">View</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="8">No integrity logs found.</td></tr>
+        <tr><td colspan="8">No integrity logs match the current filters.</td></tr>
         {% endfor %}
       </tbody>
     </table>

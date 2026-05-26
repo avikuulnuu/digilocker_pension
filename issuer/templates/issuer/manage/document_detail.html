@@ -8,8 +8,6 @@
     {% if can_view_file %}
     <a class="btn btn-secondary" href="{{ file_view_url }}" target="_blank" rel="noopener">View document</a>
     {% endif %}
-    <a class="btn" href="{% url 'issuer:document-update' object.pk %}">Edit</a>
-    <a class="btn btn-danger" href="{% url 'issuer:document-delete' object.pk %}">Delete</a>
   </div>
   {% if not can_view_file %}
   <div class="panel" style="margin-bottom:24px;background:#fff7ed;border-color:#fed7aa;">

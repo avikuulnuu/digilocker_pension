@@ -5,8 +5,6 @@
   <p class="sub">Txn: {{ object.txn_id|default:"—" }}</p>
   <div class="actions">
     <a class="btn btn-outline" href="{% url 'issuer:accesslog-list' %}">Back to list</a>
-    <a class="btn" href="{% url 'issuer:accesslog-update' object.pk %}">Edit</a>
-    <a class="btn btn-danger" href="{% url 'issuer:accesslog-delete' object.pk %}">Delete</a>
   </div>
   <div class="panel">
     <dl class="detail-grid">

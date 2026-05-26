@@ -5,8 +5,6 @@
   <p class="sub">{{ object.issue_type }}</p>
   <div class="actions">
     <a class="btn btn-outline" href="{% url 'issuer:integritylog-list' %}">Back to list</a>
-    <a class="btn" href="{% url 'issuer:integritylog-update' object.pk %}">Edit</a>
-    <a class="btn btn-danger" href="{% url 'issuer:integritylog-delete' object.pk %}">Delete</a>
   </div>
   <div class="panel">
     <dl class="detail-grid">

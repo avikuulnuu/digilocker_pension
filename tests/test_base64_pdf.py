@@ -3,10 +3,26 @@
 import base64
 import re
 
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
 
+from issuer.models import Document
 from issuer.services.base64_pdf import decode_pdf_bytes, normalize_base64_input
+
+User = get_user_model()
+
+
+def _login_manage_portal(client):
+    user = User.objects.create_user(username="decode_tester", password="unused")
+    perm = Permission.objects.get(
+        codename="access_manage_portal",
+        content_type=ContentType.objects.get_for_model(Document),
+    )
+    user.user_permissions.add(perm)
+    client.force_login(user)
 
 _MINIMAL_PDF = b"%PDF-1.4 minimal"
 
@@ -35,6 +51,9 @@ class Base64PdfServiceTest(TestCase):
 
 
 class DecodePdfManageViewTest(TestCase):
+    def setUp(self):
+        _login_manage_portal(self.client)
+
     def test_tool_decode_and_view_roundtrip(self):
         b64 = base64.b64encode(_MINIMAL_PDF).decode()
         tool_url = reverse("issuer:decode-pdf-tool")
@@ -61,3 +80,8 @@ class DecodePdfManageViewTest(TestCase):
         url = reverse("issuer:decode-pdf-view", kwargs={"token": "missing-token"})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
+
+    def test_anonymous_decode_tool_redirects_to_login(self):
+        anonymous = self.client_class()
+        response = anonymous.get(reverse("issuer:decode-pdf-tool"))
+        self.assertEqual(response.status_code, 302)

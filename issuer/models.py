@@ -47,6 +47,9 @@ class Document(models.Model):
 
     class Meta:
         db_table = "digilocker_documents"
+        permissions = [
+            ("access_manage_portal", "Can access the issuer management console"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["authorization_number", "document_type"],

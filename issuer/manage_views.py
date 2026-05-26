@@ -1,4 +1,4 @@
-"""CRUD management UI for Document, AccessLog, and IntegrityLog."""
+"""Read-only management UI for Document, AccessLog, and IntegrityLog."""
 
 import base64
 import csv
@@ -10,14 +10,34 @@ from io import StringIO
 
 from django.conf import settings
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.http import Http404, HttpResponse
 from django.utils import timezone
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
-from issuer.forms import AccessLogForm, DocumentForm, IntegrityLogForm
+from issuer.kpi_report import (
+    KPI_MIN_DATE,
+    build_kpi_report,
+    export_kpi_csv,
+    kpi_definitions,
+    parse_period,
+    previous_month_range,
+)
+from issuer.manage_filters import (
+    ACCESSLOG_FILTER_FIELDS,
+    DOCUMENT_FILTER_FIELDS,
+    INTEGRITYLOG_FILTER_FIELDS,
+    accesslog_filter_choices,
+    build_filter_query,
+    document_filter_choices,
+    filter_access_logs,
+    filter_documents,
+    filter_integrity_logs,
+    get_filter_params,
+    integritylog_filter_choices,
+)
 from issuer.models import AccessLog, Document, IntegrityLog
 from issuer.services.base64_pdf import decode_pdf_bytes
 from issuer.services.file_service import (
@@ -106,23 +126,19 @@ def _document_file_available(doc: Document) -> bool:
 
 
 def document_list(request):
-    q = request.GET.get("q", "").strip()
-    qs = Document.objects.all().order_by("-created_at")
-    if q:
-        qs = qs.filter(
-            Q(authorization_number__icontains=q)
-            | Q(document_type__icontains=q)
-            | Q(employee_name__icontains=q)
-            | Q(digilocker_uri__icontains=q)
-            | Q(external_system_id__icontains=q)
-        )
+    filters = get_filter_params(request, DOCUMENT_FILTER_FIELDS)
+    qs = filter_documents(params=filters)
+    choices = document_filter_choices()
+    query = build_filter_query(filters)
     return render(
         request,
         "issuer/manage/document_list.html",
         {
             "page_obj": _paginate(request, qs),
-            "q": q,
-            "export_url": reverse("issuer:document-export") + (f"?q={q}" if q else ""),
+            "filters": filters,
+            "filter_query": query,
+            "clear_url": reverse("issuer:document-list"),
+            "document_types": choices["document_types"],
         },
     )
 
@@ -171,75 +187,9 @@ def document_view_file(request, pk):
     return response
 
 
-@require_http_methods(["GET", "POST"])
-def document_create(request):
-    if request.method == "POST":
-        form = DocumentForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect("issuer:document-list")
-    else:
-        form = DocumentForm()
-    return render(
-        request,
-        "issuer/manage/form.html",
-        {
-            "form": form,
-            "title": "Create Document",
-            "cancel_url": reverse("issuer:document-list"),
-        },
-    )
-
-
-@require_http_methods(["GET", "POST"])
-def document_update(request, pk):
-    obj = get_object_or_404(Document, pk=pk)
-    if request.method == "POST":
-        form = DocumentForm(request.POST, instance=obj)
-        if form.is_valid():
-            form.save()
-            return redirect("issuer:document-detail", pk=pk)
-    else:
-        form = DocumentForm(instance=obj)
-    return render(
-        request,
-        "issuer/manage/form.html",
-        {
-            "form": form,
-            "title": f"Edit Document #{pk}",
-            "cancel_url": reverse("issuer:document-detail", pk=pk),
-        },
-    )
-
-
-@require_http_methods(["GET", "POST"])
-def document_delete(request, pk):
-    obj = get_object_or_404(Document, pk=pk)
-    if request.method == "POST":
-        obj.delete()
-        return redirect("issuer:document-list")
-    return render(
-        request,
-        "issuer/manage/confirm_delete.html",
-        {
-            "object": obj,
-            "object_label": str(obj),
-            "cancel_url": reverse("issuer:document-detail", pk=pk),
-        },
-    )
-
-
 def document_export(request):
-    q = request.GET.get("q", "").strip()
-    qs = Document.objects.all().order_by("-created_at")
-    if q:
-        qs = qs.filter(
-            Q(authorization_number__icontains=q)
-            | Q(document_type__icontains=q)
-            | Q(employee_name__icontains=q)
-            | Q(digilocker_uri__icontains=q)
-            | Q(external_system_id__icontains=q)
-        )
+    filters = get_filter_params(request, DOCUMENT_FILTER_FIELDS)
+    qs = filter_documents(params=filters)
     fieldnames = [f.name for f in Document._meta.fields]
     rows = [{f.name: getattr(obj, f.name) for f in Document._meta.fields} for obj in qs]
     return _export_csv("digilocker_documents.csv", fieldnames, rows)
@@ -249,22 +199,23 @@ def document_export(request):
 
 
 def accesslog_list(request):
-    q = request.GET.get("q", "").strip()
-    qs = AccessLog.objects.select_related("document").all().order_by("-created_at")
-    if q:
-        qs = qs.filter(
-            Q(txn_id__icontains=q)
-            | Q(authorization_number__icontains=q)
-            | Q(digilocker_id__icontains=q)
-            | Q(requested_mobile__icontains=q)
-        )
+    filters = get_filter_params(request, ACCESSLOG_FILTER_FIELDS)
+    qs = filter_access_logs(params=filters).select_related("document")
+    choices = accesslog_filter_choices()
+    query = build_filter_query(filters)
+    export_url = reverse("issuer:accesslog-export")
+    if query:
+        export_url = f"{export_url}?{query}"
     return render(
         request,
         "issuer/manage/accesslog_list.html",
         {
             "page_obj": _paginate(request, qs),
-            "q": q,
-            "export_url": reverse("issuer:accesslog-export") + (f"?q={q}" if q else ""),
+            "filters": filters,
+            "filter_query": query,
+            "export_url": export_url,
+            "clear_url": reverse("issuer:accesslog-list"),
+            "document_types": choices["document_types"],
         },
     )
 
@@ -274,74 +225,9 @@ def accesslog_detail(request, pk):
     return render(request, "issuer/manage/accesslog_detail.html", {"object": obj})
 
 
-@require_http_methods(["GET", "POST"])
-def accesslog_create(request):
-    if request.method == "POST":
-        form = AccessLogForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect("issuer:accesslog-list")
-    else:
-        form = AccessLogForm()
-    return render(
-        request,
-        "issuer/manage/form.html",
-        {
-            "form": form,
-            "title": "Create Access Log",
-            "cancel_url": reverse("issuer:accesslog-list"),
-        },
-    )
-
-
-@require_http_methods(["GET", "POST"])
-def accesslog_update(request, pk):
-    obj = get_object_or_404(AccessLog, pk=pk)
-    if request.method == "POST":
-        form = AccessLogForm(request.POST, instance=obj)
-        if form.is_valid():
-            form.save()
-            return redirect("issuer:accesslog-detail", pk=pk)
-    else:
-        form = AccessLogForm(instance=obj)
-    return render(
-        request,
-        "issuer/manage/form.html",
-        {
-            "form": form,
-            "title": f"Edit Access Log #{pk}",
-            "cancel_url": reverse("issuer:accesslog-detail", pk=pk),
-        },
-    )
-
-
-@require_http_methods(["GET", "POST"])
-def accesslog_delete(request, pk):
-    obj = get_object_or_404(AccessLog, pk=pk)
-    if request.method == "POST":
-        obj.delete()
-        return redirect("issuer:accesslog-list")
-    return render(
-        request,
-        "issuer/manage/confirm_delete.html",
-        {
-            "object": obj,
-            "object_label": str(obj),
-            "cancel_url": reverse("issuer:accesslog-detail", pk=pk),
-        },
-    )
-
-
 def accesslog_export(request):
-    q = request.GET.get("q", "").strip()
-    qs = AccessLog.objects.all().order_by("-created_at")
-    if q:
-        qs = qs.filter(
-            Q(txn_id__icontains=q)
-            | Q(authorization_number__icontains=q)
-            | Q(digilocker_id__icontains=q)
-            | Q(requested_mobile__icontains=q)
-        )
+    filters = get_filter_params(request, ACCESSLOG_FILTER_FIELDS)
+    qs = filter_access_logs(params=filters)
     fieldnames = [f.name for f in AccessLog._meta.fields]
     rows = [{f.name: getattr(obj, f.name) for f in AccessLog._meta.fields} for obj in qs]
     return _export_csv("access_logs.csv", fieldnames, rows)
@@ -351,22 +237,25 @@ def accesslog_export(request):
 
 
 def integritylog_list(request):
-    q = request.GET.get("q", "").strip()
-    qs = IntegrityLog.objects.select_related("document").all().order_by("-created_at")
-    if q:
-        qs = qs.filter(
-            Q(issue_type__icontains=q)
-            | Q(authorization_number__icontains=q)
-            | Q(digilocker_txn__icontains=q)
-            | Q(digilocker_id__icontains=q)
-        )
+    filters = get_filter_params(request, INTEGRITYLOG_FILTER_FIELDS)
+    qs = filter_integrity_logs(params=filters).select_related("document")
+    choices = integritylog_filter_choices()
+    query = build_filter_query(filters)
+    export_url = reverse("issuer:integritylog-export")
+    if query:
+        export_url = f"{export_url}?{query}"
     return render(
         request,
         "issuer/manage/integritylog_list.html",
         {
             "page_obj": _paginate(request, qs),
-            "q": q,
-            "export_url": reverse("issuer:integritylog-export") + (f"?q={q}" if q else ""),
+            "filters": filters,
+            "filter_query": query,
+            "export_url": export_url,
+            "clear_url": reverse("issuer:integritylog-list"),
+            "issue_types": choices["issue_types"],
+            "actions": choices["actions"],
+            "document_types": choices["document_types"],
         },
     )
 
@@ -376,77 +265,69 @@ def integritylog_detail(request, pk):
     return render(request, "issuer/manage/integritylog_detail.html", {"object": obj})
 
 
-@require_http_methods(["GET", "POST"])
-def integritylog_create(request):
-    if request.method == "POST":
-        form = IntegrityLogForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect("issuer:integritylog-list")
-    else:
-        form = IntegrityLogForm()
-    return render(
-        request,
-        "issuer/manage/form.html",
-        {
-            "form": form,
-            "title": "Create Integrity Log",
-            "cancel_url": reverse("issuer:integritylog-list"),
-        },
-    )
-
-
-@require_http_methods(["GET", "POST"])
-def integritylog_update(request, pk):
-    obj = get_object_or_404(IntegrityLog, pk=pk)
-    if request.method == "POST":
-        form = IntegrityLogForm(request.POST, instance=obj)
-        if form.is_valid():
-            form.save()
-            return redirect("issuer:integritylog-detail", pk=pk)
-    else:
-        form = IntegrityLogForm(instance=obj)
-    return render(
-        request,
-        "issuer/manage/form.html",
-        {
-            "form": form,
-            "title": f"Edit Integrity Log #{pk}",
-            "cancel_url": reverse("issuer:integritylog-detail", pk=pk),
-        },
-    )
-
-
-@require_http_methods(["GET", "POST"])
-def integritylog_delete(request, pk):
-    obj = get_object_or_404(IntegrityLog, pk=pk)
-    if request.method == "POST":
-        obj.delete()
-        return redirect("issuer:integritylog-list")
-    return render(
-        request,
-        "issuer/manage/confirm_delete.html",
-        {
-            "object": obj,
-            "object_label": str(obj),
-            "cancel_url": reverse("issuer:integritylog-detail", pk=pk),
-        },
-    )
-
-
 def integritylog_export(request):
-    q = request.GET.get("q", "").strip()
-    qs = IntegrityLog.objects.all().order_by("-created_at")
-    if q:
-        qs = qs.filter(
-            Q(issue_type__icontains=q)
-            | Q(authorization_number__icontains=q)
-            | Q(digilocker_txn__icontains=q)
-            | Q(digilocker_id__icontains=q)
-        )
+    filters = get_filter_params(request, INTEGRITYLOG_FILTER_FIELDS)
+    qs = filter_integrity_logs(params=filters)
     fieldnames = [f.name for f in IntegrityLog._meta.fields]
     rows = [{f.name: getattr(obj, f.name) for f in IntegrityLog._meta.fields} for obj in qs]
     return _export_csv("integrity_logs.csv", fieldnames, rows)
+
+
+# --- KPI report ---
+
+
+def kpi_report(request):
+    default_from, default_to = previous_month_range()
+    date_from_str = request.GET.get("date_from", "")
+    date_to_str = request.GET.get("date_to", "")
+    date_from, date_to, error = parse_period(date_from_str, date_to_str)
+
+    report = build_kpi_report(date_from, date_to) if not error else None
+
+    download_query = ""
+    if date_from and date_to and not error:
+        from urllib.parse import urlencode
+
+        download_query = urlencode(
+            {"date_from": date_from.isoformat(), "date_to": date_to.isoformat()}
+        )
+
+    return render(
+        request,
+        "issuer/manage/kpi_report.html",
+        {
+            "date_from": date_from.isoformat(),
+            "date_to": date_to.isoformat(),
+            "default_from": default_from.isoformat(),
+            "default_to": default_to.isoformat(),
+            "min_date": KPI_MIN_DATE.isoformat(),
+            "error": error,
+            "report": report,
+            "kpi_catalog": kpi_definitions(),
+            "download_url": (
+                reverse("issuer:kpi-report-download") + f"?{download_query}"
+                if download_query
+                else ""
+            ),
+        },
+    )
+
+
+@require_http_methods(["GET"])
+def kpi_report_download(request):
+    date_from, date_to, error = parse_period(
+        request.GET.get("date_from", ""),
+        request.GET.get("date_to", ""),
+    )
+    if error:
+        return HttpResponse(error, status=400)
+
+    report = build_kpi_report(date_from, date_to)
+    csv_body = export_kpi_csv(report)
+    filename = f"kpi_report_{date_from}_{date_to}.csv"
+    response = HttpResponse(csv_body, content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
 
 
 # --- Base64 PDF decoder (manage tools) ---
@@ -535,3 +416,28 @@ def decode_pdf_view(request, token):
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
     response["Content-Disposition"] = 'inline; filename="decoded.pdf"'
     return response
+
+
+# Require login + issuer.access_manage_portal on all management console views.
+from issuer.manage_auth import require_manage_portal  # noqa: E402
+
+_MANAGE_PORTAL_VIEWS = (
+    "manage_hub",
+    "document_list",
+    "document_detail",
+    "document_view_file",
+    "document_export",
+    "accesslog_list",
+    "accesslog_detail",
+    "accesslog_export",
+    "integritylog_list",
+    "integritylog_detail",
+    "integritylog_export",
+    "kpi_report",
+    "kpi_report_download",
+    "decode_pdf_tool",
+    "decode_pdf_view",
+)
+
+for _manage_view_name in _MANAGE_PORTAL_VIEWS:
+    globals()[_manage_view_name] = require_manage_portal(globals()[_manage_view_name])

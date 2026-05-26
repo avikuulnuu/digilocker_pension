@@ -1,0 +1,138 @@
+{% extends "issuer/manage/base.html" %}
+{% block title %}KPI Report{% endblock %}
+{% block content %}
+  <h1>KPI Report</h1>
+  <p class="sub">Operational metrics for the selected period. Default range is the previous calendar month.</p>
+
+  <div class="panel kpi-filters-panel">
+    <form method="get">
+      <div class="kpi-period-row">
+        <div class="filter-grid kpi-period-fields">
+          <div class="filter-field">
+            <label for="date_from">From</label>
+            <input id="date_from" type="date" name="date_from" value="{{ date_from }}" min="{{ min_date }}" />
+          </div>
+          <div class="filter-field">
+            <label for="date_to">To</label>
+            <input id="date_to" type="date" name="date_to" value="{{ date_to }}" min="{{ min_date }}" />
+          </div>
+        </div>
+        <div class="kpi-period-actions">
+          <button type="submit" class="btn">Search</button>
+          <a class="btn btn-outline" href="{% url 'issuer:kpi-report' %}">Reset to defaults</a>
+          {% if download_url %}
+          <a class="btn btn-secondary" href="{{ download_url }}">Download CSV</a>
+          {% endif %}
+        </div>
+      </div>
+      <p class="sub kpi-filter-hint">
+        Default: {{ default_from }} – {{ default_to }} · Earliest date: {{ min_date }}
+      </p>
+    </form>
+    {% if error %}
+    <p class="kpi-error">{{ error }}</p>
+    {% endif %}
+  </div>
+
+  {% if report %}
+  <div class="panel kpi-preview-panel">
+    <div class="kpi-preview-header">
+      <div>
+        <h2>Report results</h2>
+        <p class="sub kpi-preview-meta">
+          {{ report.date_from }} to {{ report.date_to }} · Generated {{ report.generated_at|date:"Y-m-d H:i" }}
+        </p>
+      </div>
+      {% if download_url %}
+      <a class="btn btn-secondary" href="{{ download_url }}">Download CSV</a>
+      {% endif %}
+    </div>
+
+    {% if report.highlights %}
+    <div class="stat-cards kpi-highlight-cards">
+      {% for h in report.highlights %}
+      <div class="stat-card {{ h.variant }}">
+        <div class="value">{{ h.value }}</div>
+        <div class="label">{{ h.label }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <h3 class="kpi-section-title">Full metrics</h3>
+    <div class="kpi-table-scroll">
+      <table class="kpi-metrics-table">
+        <thead>
+          <tr><th>Section</th><th>Metric</th><th>Value</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          {% for section, metric, value, notes in report.summary_rows %}
+          {% if section or metric %}
+          <tr>
+            <td>{{ section }}</td>
+            <td>{{ metric }}</td>
+            <td class="kpi-value-cell"><strong>{{ value }}</strong></td>
+            <td class="kpi-notes-cell">{{ notes }}</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if report.access_by_type %}
+    <h3 class="kpi-section-title">Access logs by document type</h3>
+    <div class="kpi-table-scroll kpi-table-scroll--short">
+      <table>
+        <thead><tr><th>Type</th><th>Total</th><th>Success</th><th>Failed</th></tr></thead>
+        <tbody>
+          {% for row in report.access_by_type %}
+          <tr>
+            <td>{{ row.document_type|default:"(blank)" }}</td>
+            <td>{{ row.total }}</td>
+            <td>{{ row.success }}</td>
+            <td>{{ row.failed }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if report.integrity_by_issue %}
+    <h3 class="kpi-section-title">Integrity events by issue type</h3>
+    <div class="kpi-table-scroll kpi-table-scroll--short">
+      <table>
+        <thead><tr><th>Issue type</th><th>Count</th></tr></thead>
+        <tbody>
+          {% for row in report.integrity_by_issue %}
+          <tr><td>{{ row.issue_type }}</td><td>{{ row.count }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+  {% elif not error %}
+  <div class="panel kpi-empty-preview">
+    <p>Select a date range and click <strong>Search</strong> to generate the report.</p>
+  </div>
+  {% endif %}
+
+  <details class="kpi-catalog-details">
+    <summary>What metrics are included? (reference)</summary>
+    <div class="kpi-catalog-body">
+      {% for group in kpi_catalog %}
+      <div class="kpi-catalog-group">
+        <h3>{{ group.category }}</h3>
+        <p class="sub">Scope: {{ group.scope }}</p>
+        <ul>
+          {% for m in group.metrics %}
+          <li>{{ m }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+  </details>
+{% endblock %}

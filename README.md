@@ -88,6 +88,16 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
+### 6b. Create a management console user (optional)
+
+The issuer management UI at `/issuer/manage/` requires login and the **access manage portal** permission. These accounts are **separate from Django admin** (`/admin/`): manage users are not given `is_staff` and the console does not link to admin.
+
+```bash
+python manage.py create_manage_portal_user --username ops
+```
+
+Use `createsuperuser` only for Django admin operators. Superusers can sign in to the management console without the explicit permission, but day-to-day ops accounts should use `create_manage_portal_user` only. To grant an existing user manage access, assign permission `issuer | document | Can access the issuer management console` and ensure `is_staff` remains **unchecked**.
+
 ### 7. Run the server
 
 ```bash
@@ -96,6 +106,9 @@ python manage.py runserver 8000
 
 The API is available at `http://127.0.0.1:8000/issuer/pull-uri`
 Admin panel at `http://127.0.0.1:8000/admin/`
+Management console at `http://127.0.0.1:8000/issuer/manage/` (sign-in required; use **Sign in** / **Sign out** in the sidebar or top bar)
+
+**Network restriction:** `/admin/` and `/issuer/manage/` are only reachable from IPs in `ADMIN_IP_ALLOWLIST` (see `.env.example`). In production set office/VPN CIDRs and `TRUST_X_FORWARDED_FOR=True` if behind nginx or a load balancer.
 
 ---
 

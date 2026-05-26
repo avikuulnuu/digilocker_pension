@@ -4,14 +4,73 @@
   <h1>Access Logs</h1>
   <p class="sub">All records in access_logs.</p>
   <div class="panel">
-    <div class="toolbar">
-      <form method="get">
-        <input type="text" name="q" value="{{ q }}" placeholder="Search txn, auth, mobile…" />
-        <button type="submit" class="btn">Search</button>
-      </form>
-      <a class="btn" href="{% url 'issuer:accesslog-create' %}">Create</a>
-      <a class="btn btn-secondary" href="{{ export_url }}">Download report (CSV)</a>
-    </div>
+    <form method="get" class="filter-panel">
+      <h2>Filters</h2>
+      <div class="filter-grid">
+        <div class="filter-field">
+          <label for="f_q">Quick search</label>
+          <input id="f_q" type="text" name="q" value="{{ filters.q }}" placeholder="Txn, auth, mobile, error…" />
+        </div>
+        <div class="filter-field">
+          <label for="f_txn">Transaction ID</label>
+          <input id="f_txn" type="text" name="txn_id" value="{{ filters.txn_id }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_auth">Authorization number</label>
+          <input id="f_auth" type="text" name="authorization_number" value="{{ filters.authorization_number }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_type">Document type</label>
+          <select id="f_type" name="document_type">
+            <option value="">All types</option>
+            {% for t in document_types %}
+            <option value="{{ t }}" {% if filters.document_type == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="f_dlid">DigiLocker ID</label>
+          <input id="f_dlid" type="text" name="digilocker_id" value="{{ filters.digilocker_id }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_ip">Request IP</label>
+          <input id="f_ip" type="text" name="request_ip" value="{{ filters.request_ip }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_mobile">Requested mobile</label>
+          <input id="f_mobile" type="text" name="requested_mobile" value="{{ filters.requested_mobile }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_status">Response status</label>
+          <select id="f_status" name="response_status">
+            <option value="" {% if not filters.response_status %}selected{% endif %}>Any</option>
+            <option value="success" {% if filters.response_status == "success" %}selected{% endif %}>Success (1)</option>
+            <option value="error" {% if filters.response_status == "error" %}selected{% endif %}>Error (not 1)</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="f_err">Has error message</label>
+          <select id="f_err" name="has_error">
+            <option value="" {% if not filters.has_error %}selected{% endif %}>Any</option>
+            <option value="yes" {% if filters.has_error == "yes" %}selected{% endif %}>Yes</option>
+            <option value="no" {% if filters.has_error == "no" %}selected{% endif %}>No</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="f_from">Created from</label>
+          <input id="f_from" type="date" name="created_from" value="{{ filters.created_from }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_to">Created to</label>
+          <input id="f_to" type="date" name="created_to" value="{{ filters.created_to }}" />
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button type="submit" class="btn">Apply filters</button>
+        <a class="btn btn-outline" href="{{ clear_url }}">Clear</a>
+        <a class="btn btn-secondary" href="{{ export_url }}">Download CSV</a>
+      </div>
+    </form>
     <table>
       <thead>
         <tr>
@@ -38,7 +97,7 @@
           <td><a href="{% url 'issuer:accesslog-detail' obj.pk %}">View</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="8">No access logs found.</td></tr>
+        <tr><td colspan="8">No access logs match the current filters.</td></tr>
         {% endfor %}
       </tbody>
     </table>

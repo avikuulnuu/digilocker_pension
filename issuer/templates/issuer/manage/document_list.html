@@ -4,14 +4,84 @@
   <h1>DigiLocker Documents</h1>
   <p class="sub">All records in digilocker_documents.</p>
   <div class="panel">
-    <div class="toolbar">
-      <form method="get">
-        <input type="text" name="q" value="{{ q }}" placeholder="Search auth no, type, name, URI…" />
-        <button type="submit" class="btn">Search</button>
-      </form>
-      <a class="btn" href="{% url 'issuer:document-create' %}">Create</a>
-      <a class="btn btn-secondary" href="{{ export_url }}">Download report (CSV)</a>
-    </div>
+    <form method="get" class="filter-panel">
+      <h2>Filters</h2>
+      <div class="filter-grid">
+        <div class="filter-field">
+          <label for="f_q">Quick search</label>
+          <input id="f_q" type="text" name="q" value="{{ filters.q }}" placeholder="Auth, name, URI, file…" />
+        </div>
+        <div class="filter-field">
+          <label for="f_auth">Authorization number</label>
+          <input id="f_auth" type="text" name="authorization_number" value="{{ filters.authorization_number }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_type">Document type</label>
+          <select id="f_type" name="document_type">
+            <option value="">All types</option>
+            {% for t in document_types %}
+            <option value="{{ t }}" {% if filters.document_type == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="f_emp">Employee name</label>
+          <input id="f_emp" type="text" name="employee_name" value="{{ filters.employee_name }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_mobile">Mobile</label>
+          <input id="f_mobile" type="text" name="employee_mobile" value="{{ filters.employee_mobile }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_file">File name</label>
+          <input id="f_file" type="text" name="file_name" value="{{ filters.file_name }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_ext">External system ID</label>
+          <input id="f_ext" type="text" name="external_system_id" value="{{ filters.external_system_id }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_uri">DigiLocker URI</label>
+          <input id="f_uri" type="text" name="digilocker_uri" value="{{ filters.digilocker_uri }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_active">Active</label>
+          <select id="f_active" name="is_active">
+            <option value="" {% if not filters.is_active %}selected{% endif %}>Any</option>
+            <option value="yes" {% if filters.is_active == "yes" %}selected{% endif %}>Yes</option>
+            <option value="no" {% if filters.is_active == "no" %}selected{% endif %}>No</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="f_dl">DigiLocker enabled</label>
+          <select id="f_dl" name="digilocker_enabled">
+            <option value="" {% if not filters.digilocker_enabled %}selected{% endif %}>Any</option>
+            <option value="yes" {% if filters.digilocker_enabled == "yes" %}selected{% endif %}>Yes</option>
+            <option value="no" {% if filters.digilocker_enabled == "no" %}selected{% endif %}>No</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="f_fexists">File exists (DB flag)</label>
+          <select id="f_fexists" name="file_exists">
+            <option value="" {% if not filters.file_exists %}selected{% endif %}>Any</option>
+            <option value="yes" {% if filters.file_exists == "yes" %}selected{% endif %}>Yes</option>
+            <option value="no" {% if filters.file_exists == "no" %}selected{% endif %}>No</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="f_from">Created from</label>
+          <input id="f_from" type="date" name="created_from" value="{{ filters.created_from }}" />
+        </div>
+        <div class="filter-field">
+          <label for="f_to">Created to</label>
+          <input id="f_to" type="date" name="created_to" value="{{ filters.created_to }}" />
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button type="submit" class="btn">Apply filters</button>
+        <a class="btn btn-outline" href="{{ clear_url }}">Clear</a>
+      </div>
+    </form>
     <table>
       <thead>
         <tr>
@@ -43,7 +113,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="8">No documents found.</td></tr>
+        <tr><td colspan="8">No documents match the current filters.</td></tr>
         {% endfor %}
       </tbody>
     </table>

@@ -1,3 +1,5 @@
+import sys
+
 import environ
 from pathlib import Path
 
@@ -6,6 +8,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
+    ADMIN_IP_ALLOWLIST=(list, []),
+    TRUST_X_FORWARDED_FOR=(bool, False),
     INTEGRITY_MODE=(str, "STRICT"),
     IDENTITY_VALIDATION_MODE=(str, "STRICT"),
     LENIENT_NAME_MATCH_THRESHOLD=(float, 0.70),
@@ -32,6 +36,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "config.middleware.ip_allowlist.RestrictedAdminIPMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -90,6 +95,17 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- Management console auth ---
+LOGIN_URL = "/issuer/manage/login/"
+LOGIN_REDIRECT_URL = "/issuer/manage/"
+LOGOUT_REDIRECT_URL = "/issuer/manage/login/"
+
+# --- Admin / manage console network restriction ---
+TRUST_X_FORWARDED_FOR = env("TRUST_X_FORWARDED_FOR")
+RESTRICTED_ADMIN_IP_ALLOWLIST = env.list("ADMIN_IP_ALLOWLIST")
+if not RESTRICTED_ADMIN_IP_ALLOWLIST and (DEBUG or "test" in sys.argv):
+    RESTRICTED_ADMIN_IP_ALLOWLIST = ["127.0.0.1", "::1"]
 
 # --- DigiLocker Issuer Configuration ---
 DIGILOCKER_ISSUER_ID = env("ISSUER_ID")
