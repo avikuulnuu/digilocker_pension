@@ -96,7 +96,7 @@ class AccessLog(models.Model):
         Document, on_delete=models.SET_NULL, null=True, blank=True
     )
     authorization_number = models.CharField(max_length=50, blank=True, default="")
-    document_type = models.CharField(max_length=5, blank=True, default="")
+    document_type = models.CharField(max_length=30, blank=True, default="")
     txn_id = models.CharField(max_length=100, blank=True, default="")
     digilocker_id = models.CharField(max_length=255, blank=True, default="")
     request_ip = models.GenericIPAddressField(null=True, blank=True)

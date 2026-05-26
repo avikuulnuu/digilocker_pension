@@ -130,7 +130,7 @@ LOGGING = {
     "loggers": {
         "issuer": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": "DEBUG" if DEBUG else "INFO",
             "propagate": False,
         },
         "django": {

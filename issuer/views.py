@@ -188,11 +188,28 @@ def document_fetch_view(request, uri):
 
 def _log_access(data: dict, doc, status: int, elapsed_ms: int, error: str = ""):
     """Write an access log entry."""
+    # Log doc and document_type details to help debug DB data errors
     try:
+        doc_type_val = data.get("document_type", "") or ""
+        logger.debug(
+            "AccessLog create attempt: doc=%r document_type=%r len=%d authorization_number=%r txn_id=%r",
+            doc,
+            doc_type_val,
+            len(doc_type_val),
+            data.get("authorization_number"),
+            data.get("txn_id"),
+        )
+        if len(doc_type_val) > 30:
+            logger.warning(
+                "document_type length (%d) exceeds DB max (30): %r",
+                len(doc_type_val),
+                doc_type_val,
+            )
+            doc_type_val = doc_type_val[:30]
         AccessLog.objects.create(
             document=doc,
             authorization_number=data.get("authorization_number", ""),
-            document_type=data.get("document_type", ""),
+            document_type=doc_type_val,
             txn_id=data.get("txn_id", ""),
             digilocker_id=data.get("digilocker_id", ""),
             request_ip=data.get("request_ip"),

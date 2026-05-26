@@ -26,8 +26,20 @@ def verify_hmac(raw_body: bytes, received_hmac: str) -> None:
         hmac_mod.new(api_key, raw_body, hashlib.sha256).digest()
     ).decode("utf-8")
 
+    # Temporary debug logging to help diagnose mismatches. Remove when finished.
+    try:
+        body_b64 = base64.b64encode(raw_body).decode("utf-8")
+    except Exception:
+        body_b64 = "<unable to base64-encode>"
+    logger.debug("HMAC debug: received=%s computed=%s body_b64=%s", received_hmac, computed, body_b64)
+
     if not hmac_mod.compare_digest(computed, received_hmac):
-        logger.warning("HMAC verification failed")
+        logger.warning(
+            "HMAC verification failed: received=%s computed=%s body_len=%d",
+            received_hmac,
+            computed,
+            len(raw_body),
+        )
         raise AuthenticationError("Invalid HMAC signature")
 
 
@@ -35,6 +47,8 @@ def verify_keyhash(keyhash: str, timestamp_str: str) -> None:
     """Verify KeyHash = SHA256(API_KEY + timestamp)."""
     api_key = settings.DIGILOCKER_API_KEY
     expected = hashlib.sha256((api_key + timestamp_str).encode("utf-8")).hexdigest()
+    # Temporary debug logging to help diagnose KeyHash mismatches.
+    logger.debug("KeyHash debug: received=%s expected=%s timestamp=%s", keyhash, expected, timestamp_str)
     if not hmac_mod.compare_digest(expected, keyhash):
         logger.warning("KeyHash verification failed")
         raise AuthenticationError("Invalid KeyHash")
