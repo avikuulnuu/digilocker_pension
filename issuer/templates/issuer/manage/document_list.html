@@ -1,0 +1,47 @@
+{% extends "issuer/manage/base.html" %}
+{% block title %}Documents{% endblock %}
+{% block content %}
+  <h1>DigiLocker Documents</h1>
+  <p class="sub">All records in digilocker_documents.</p>
+  <div class="panel">
+    <div class="toolbar">
+      <form method="get">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search auth no, type, name, URI…" />
+        <button type="submit" class="btn">Search</button>
+      </form>
+      <a class="btn" href="{% url 'issuer:document-create' %}">Create</a>
+      <a class="btn btn-secondary" href="{{ export_url }}">Download report (CSV)</a>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Auth #</th>
+          <th>Type</th>
+          <th>Employee</th>
+          <th>URI</th>
+          <th>Active</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for obj in page_obj %}
+        <tr>
+          <td>{{ obj.id }}</td>
+          <td>{{ obj.authorization_number }}</td>
+          <td>{{ obj.document_type }}</td>
+          <td>{{ obj.employee_name|truncatechars:30 }}</td>
+          <td>{{ obj.digilocker_uri|default:"—"|truncatechars:24 }}</td>
+          <td>{% if obj.is_active %}Yes{% else %}No{% endif %}</td>
+          <td>{{ obj.created_at|date:"Y-m-d H:i" }}</td>
+          <td><a href="{% url 'issuer:document-detail' obj.pk %}">View</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8">No documents found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% include "issuer/manage/_pagination.html" %}
+  </div>
+{% endblock %}

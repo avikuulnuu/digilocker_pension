@@ -1,0 +1,30 @@
+{% extends "issuer/manage/base.html" %}
+{% block title %}Integrity Log #{{ object.id }}{% endblock %}
+{% block content %}
+  <h1>Integrity Log #{{ object.id }}</h1>
+  <p class="sub">{{ object.issue_type }}</p>
+  <div class="actions">
+    <a class="btn btn-outline" href="{% url 'issuer:integritylog-list' %}">Back to list</a>
+    <a class="btn" href="{% url 'issuer:integritylog-update' object.pk %}">Edit</a>
+    <a class="btn btn-danger" href="{% url 'issuer:integritylog-delete' object.pk %}">Delete</a>
+  </div>
+  <div class="panel">
+    <dl class="detail-grid">
+      <dt>ID</dt><dd>{{ object.id }}</dd>
+      <dt>Document</dt><dd>{% if object.document %}<a href="{% url 'issuer:document-detail' object.document_id %}">#{{ object.document_id }}</a>{% else %}—{% endif %}</dd>
+      <dt>Issue type</dt><dd>{{ object.issue_type }}</dd>
+      <dt>Stored checksum</dt><dd>{{ object.stored_checksum }}</dd>
+      <dt>Calculated checksum</dt><dd>{{ object.calculated_checksum }}</dd>
+      <dt>File path</dt><dd>{{ object.file_path }}</dd>
+      <dt>Action taken</dt><dd>{{ object.action_taken }}</dd>
+      <dt>Authorization number</dt><dd>{{ object.authorization_number }}</dd>
+      <dt>Document type</dt><dd>{{ object.document_type }}</dd>
+      <dt>Stored file size</dt><dd>{{ object.stored_file_size|default:"—" }}</dd>
+      <dt>Calculated file size</dt><dd>{{ object.calculated_file_size|default:"—" }}</dd>
+      <dt>Request IP</dt><dd>{{ object.request_ip }}</dd>
+      <dt>DigiLocker txn</dt><dd>{{ object.digilocker_txn }}</dd>
+      <dt>DigiLocker ID</dt><dd>{{ object.digilocker_id }}</dd>
+      <dt>Created at</dt><dd>{{ object.created_at }}</dd>
+    </dl>
+  </div>
+{% endblock %}
