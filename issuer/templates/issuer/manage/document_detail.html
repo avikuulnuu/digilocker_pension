@@ -1,0 +1,42 @@
+{% extends "issuer/manage/base.html" %}
+{% block title %}Document #{{ object.id }}{% endblock %}
+{% block content %}
+  <h1>Document #{{ object.id }}</h1>
+  <p class="sub">{{ object.authorization_number }} / {{ object.document_type }}</p>
+  <div class="actions">
+    <a class="btn btn-outline" href="{% url 'issuer:document-list' %}">Back to list</a>
+    <a class="btn" href="{% url 'issuer:document-update' object.pk %}">Edit</a>
+    <a class="btn btn-danger" href="{% url 'issuer:document-delete' object.pk %}">Delete</a>
+  </div>
+  <div class="panel">
+    <dl class="detail-grid">
+      <dt>ID</dt><dd>{{ object.id }}</dd>
+      <dt>Authorization number</dt><dd>{{ object.authorization_number }}</dd>
+      <dt>Document type</dt><dd>{{ object.document_type }}</dd>
+      <dt>DigiLocker doc ID</dt><dd>{{ object.digilocker_doc_id|default:"—" }}</dd>
+      <dt>DigiLocker URI</dt><dd>{{ object.digilocker_uri|default:"—" }}</dd>
+      <dt>Employee name</dt><dd>{{ object.employee_name }}</dd>
+      <dt>Employee DOB</dt><dd>{{ object.employee_dob|default:"—" }}</dd>
+      <dt>Employee gender</dt><dd>{{ object.employee_gender }}</dd>
+      <dt>Employee mobile</dt><dd>{{ object.employee_mobile|default:"—" }}</dd>
+      <dt>DDO name</dt><dd>{{ object.ddo_name }}</dd>
+      <dt>Treasury name</dt><dd>{{ object.treasury_name|default:"—" }}</dd>
+      <dt>Treasury code</dt><dd>{{ object.treasury_code|default:"—" }}</dd>
+      <dt>Authorization date</dt><dd>{{ object.authorization_date }}</dd>
+      <dt>File name</dt><dd>{{ object.file_name }}</dd>
+      <dt>File checksum</dt><dd>{{ object.file_checksum|default:"—" }}</dd>
+      <dt>File size (bytes)</dt><dd>{{ object.file_size_bytes|default:"—" }}</dd>
+      <dt>File last checked</dt><dd>{{ object.file_last_checked_at|default:"—" }}</dd>
+      <dt>File exists</dt><dd>{{ object.file_exists }}</dd>
+      <dt>Is active</dt><dd>{{ object.is_active }}</dd>
+      <dt>DigiLocker enabled</dt><dd>{{ object.digilocker_enabled }}</dd>
+      <dt>Access count</dt><dd>{{ object.access_count }}</dd>
+      <dt>Last accessed</dt><dd>{{ object.last_accessed_at|default:"—" }}</dd>
+      <dt>Application number</dt><dd>{{ object.application_number|default:"—" }}</dd>
+      <dt>External system ID</dt><dd>{{ object.external_system_id }}</dd>
+      <dt>External metadata</dt><dd><pre style="margin:0;white-space:pre-wrap;">{{ object.external_metadata|default:"—" }}</pre></dd>
+      <dt>Created at</dt><dd>{{ object.created_at }}</dd>
+      <dt>Updated at</dt><dd>{{ object.updated_at }}</dd>
+    </dl>
+  </div>
+{% endblock %}

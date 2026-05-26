@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{% block title %}Dashboard{% endblock %} — DigiLocker</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: Arial, sans-serif; margin: 0; background: #f1f5f9; color: #1a1a1a; }
+      .app-layout { display: flex; min-height: 100vh; }
+      .sidebar {
+        width: 240px; flex-shrink: 0; background: #0f172a; color: #e2e8f0;
+        display: flex; flex-direction: column; padding: 20px 0;
+      }
+      .sidebar-brand { padding: 0 20px 20px; font-size: 1.05rem; font-weight: 700; color: #fff; border-bottom: 1px solid #1e293b; margin-bottom: 12px; }
+      .sidebar-brand span { display: block; font-size: 12px; font-weight: 400; color: #94a3b8; margin-top: 4px; }
+      .sidebar nav { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 0 12px; }
+      .sidebar nav a {
+        display: block; padding: 10px 14px; border-radius: 8px; color: #cbd5e1;
+        text-decoration: none; font-size: 14px;
+      }
+      .sidebar nav a:hover { background: #1e293b; color: #fff; }
+      .sidebar nav a.active { background: #2563eb; color: #fff; }
+      .sidebar-footer { padding: 16px 12px 0; border-top: 1px solid #1e293b; margin-top: 12px; }
+      .sidebar-footer a { display: block; padding: 10px 14px; border-radius: 8px; color: #94a3b8; text-decoration: none; font-size: 13px; }
+      .sidebar-footer a:hover { color: #fff; background: #1e293b; }
+      .main { flex: 1; padding: 28px 32px 48px; overflow-x: auto; }
+      h1 { margin: 0 0 8px; font-size: 1.6rem; }
+      .sub { color: #64748b; margin-bottom: 24px; font-size: 14px; }
+      .panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 22px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); margin-bottom: 24px; }
+      .panel h2 { margin: 0 0 16px; font-size: 1rem; color: #334155; }
+      .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 18px; }
+      .toolbar form { display: flex; gap: 8px; flex: 1; min-width: 220px; }
+      input[type="text"], input[type="number"], input[type="date"], input[type="datetime-local"],
+      select, textarea { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
+      .btn { display: inline-block; background: #2563eb; color: #fff; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; }
+      .btn-secondary { background: #475569; }
+      .btn-danger { background: #dc2626; }
+      .btn-outline { background: #fff; color: #2563eb; border: 1px solid #2563eb; }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #e8ebf3; }
+      th { background: #f8fafc; font-weight: 600; }
+      tr:hover td { background: #f8fafc; }
+      .pagination { margin-top: 18px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .pagination a, .pagination span { padding: 6px 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-decoration: none; color: #1a1a1a; font-size: 13px; }
+      .pagination .current { background: #2563eb; color: #fff; border-color: #2563eb; }
+      .detail-grid { display: grid; grid-template-columns: 220px 1fr; gap: 10px 16px; font-size: 14px; }
+      .detail-grid dt { font-weight: 600; color: #334155; }
+      .detail-grid dd { margin: 0; word-break: break-word; }
+      .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+      .field { margin-bottom: 14px; }
+      .field label { display: block; font-weight: 600; margin-bottom: 6px; }
+      .field .helptext { font-size: 12px; color: #64748b; }
+      .field ul.errorlist { color: #dc2626; margin: 4px 0 0; padding-left: 18px; }
+      .field input, .field select, .field textarea { width: 100%; max-width: 640px; }
+      .stat-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+      .stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; }
+      .stat-card .value { font-size: 2rem; font-weight: 700; line-height: 1.2; margin-bottom: 6px; }
+      .stat-card .label { font-size: 13px; color: #64748b; font-weight: 600; }
+      .stat-card .hint { font-size: 12px; color: #94a3b8; margin-top: 8px; }
+      .stat-card.success .value { color: #16a34a; }
+      .stat-card.danger .value { color: #dc2626; }
+      .stat-card.warn .value { color: #d97706; }
+      .stat-card.info .value { color: #2563eb; }
+      .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+      @media (max-width: 900px) {
+        .app-layout { flex-direction: column; }
+        .sidebar { width: 100%; }
+        .dashboard-grid { grid-template-columns: 1fr; }
+      }
+      .issue-list { list-style: none; margin: 0; padding: 0; }
+      .issue-list li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+      .badge-ok { color: #16a34a; font-weight: 600; }
+      .badge-err { color: #dc2626; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          DigiLocker Issuer
+          <span>Management console</span>
+        </div>
+        <nav>
+          {% with name=request.resolver_match.url_name|default:"" %}
+          <a href="{% url 'issuer:manage-hub' %}" class="{% if name == 'manage-hub' %}active{% endif %}">Dashboard</a>
+          <a href="{% url 'issuer:document-list' %}" class="{% if 'document' in name %}active{% endif %}">Documents</a>
+          <a href="{% url 'issuer:accesslog-list' %}" class="{% if 'accesslog' in name %}active{% endif %}">Access Logs</a>
+          <a href="{% url 'issuer:integritylog-list' %}" class="{% if 'integritylog' in name %}active{% endif %}">Integrity Logs</a>
+          {% endwith %}
+        </nav>
+        <div class="sidebar-footer">
+          <a href="{% url 'issuer:demo-ui' %}">Demo UI</a>
+        </div>
+      </aside>
+      <main class="main">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </body>
+</html>

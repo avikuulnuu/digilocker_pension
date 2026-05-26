@@ -1,0 +1,30 @@
+{% extends "issuer/manage/base.html" %}
+{% block title %}Access Log #{{ object.id }}{% endblock %}
+{% block content %}
+  <h1>Access Log #{{ object.id }}</h1>
+  <p class="sub">Txn: {{ object.txn_id|default:"—" }}</p>
+  <div class="actions">
+    <a class="btn btn-outline" href="{% url 'issuer:accesslog-list' %}">Back to list</a>
+    <a class="btn" href="{% url 'issuer:accesslog-update' object.pk %}">Edit</a>
+    <a class="btn btn-danger" href="{% url 'issuer:accesslog-delete' object.pk %}">Delete</a>
+  </div>
+  <div class="panel">
+    <dl class="detail-grid">
+      <dt>ID</dt><dd>{{ object.id }}</dd>
+      <dt>Document</dt><dd>{% if object.document %}<a href="{% url 'issuer:document-detail' object.document_id %}">#{{ object.document_id }}</a>{% else %}—{% endif %}</dd>
+      <dt>Authorization number</dt><dd>{{ object.authorization_number }}</dd>
+      <dt>Document type</dt><dd>{{ object.document_type }}</dd>
+      <dt>Txn ID</dt><dd>{{ object.txn_id }}</dd>
+      <dt>DigiLocker ID</dt><dd>{{ object.digilocker_id }}</dd>
+      <dt>Request IP</dt><dd>{{ object.request_ip|default:"—" }}</dd>
+      <dt>Requested mobile</dt><dd>{{ object.requested_mobile|default:"—" }}</dd>
+      <dt>File path</dt><dd>{{ object.file_path }}</dd>
+      <dt>File checksum</dt><dd>{{ object.file_checksum }}</dd>
+      <dt>User agent</dt><dd>{{ object.user_agent }}</dd>
+      <dt>Response status</dt><dd>{{ object.response_status }}</dd>
+      <dt>Error message</dt><dd>{{ object.error_message|default:"—" }}</dd>
+      <dt>Processing time (ms)</dt><dd>{{ object.processing_time_ms|default:"—" }}</dd>
+      <dt>Created at</dt><dd>{{ object.created_at }}</dd>
+    </dl>
+  </div>
+{% endblock %}

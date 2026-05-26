@@ -1,0 +1,47 @@
+{% extends "issuer/manage/base.html" %}
+{% block title %}Integrity Logs{% endblock %}
+{% block content %}
+  <h1>Integrity Logs</h1>
+  <p class="sub">All records in integrity_logs.</p>
+  <div class="panel">
+    <div class="toolbar">
+      <form method="get">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search issue, auth, txn…" />
+        <button type="submit" class="btn">Search</button>
+      </form>
+      <a class="btn" href="{% url 'issuer:integritylog-create' %}">Create</a>
+      <a class="btn btn-secondary" href="{{ export_url }}">Download report (CSV)</a>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Issue</th>
+          <th>Action</th>
+          <th>Auth #</th>
+          <th>Type</th>
+          <th>Doc ID</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for obj in page_obj %}
+        <tr>
+          <td>{{ obj.id }}</td>
+          <td>{{ obj.issue_type }}</td>
+          <td>{{ obj.action_taken }}</td>
+          <td>{{ obj.authorization_number }}</td>
+          <td>{{ obj.document_type }}</td>
+          <td>{{ obj.document_id|default:"—" }}</td>
+          <td>{{ obj.created_at|date:"Y-m-d H:i" }}</td>
+          <td><a href="{% url 'issuer:integritylog-detail' obj.pk %}">View</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8">No integrity logs found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% include "issuer/manage/_pagination.html" %}
+  </div>
+{% endblock %}

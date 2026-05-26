@@ -1,0 +1,133 @@
+{% extends "issuer/manage/base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+  <h1>Dashboard</h1>
+  <p class="sub">Overview of document issuance, API access, and integrity events.</p>
+
+  <div class="stat-cards">
+    <div class="stat-card success">
+      <div class="value">{{ stats.documents_served }}</div>
+      <div class="label">Documents served</div>
+      <div class="hint">Successful API responses (access log status = 1)</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="value">{{ stats.access_errors }}</div>
+      <div class="label">Access errors</div>
+      <div class="hint">Failed or rejected API requests</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="value">{{ stats.integrity_failures }}</div>
+      <div class="label">Integrity failures</div>
+      <div class="hint">Checksum / file integrity issues logged</div>
+    </div>
+    <div class="stat-card info">
+      <div class="value">{{ stats.documents_total }}</div>
+      <div class="label">Total documents</div>
+      <div class="hint">{{ stats.documents_active }} active · {{ stats.documents_enabled }} DigiLocker enabled</div>
+    </div>
+    <div class="stat-card success">
+      <div class="value">{{ stats.documents_served_today }}</div>
+      <div class="label">Served today</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="value">{{ stats.access_errors_today }}</div>
+      <div class="label">Access errors today</div>
+    </div>
+    <div class="stat-card warn">
+      <div class="value">{{ stats.integrity_failures_today }}</div>
+      <div class="label">Integrity issues today</div>
+    </div>
+    <div class="stat-card warn">
+      <div class="value">{{ stats.documents_missing_file }}</div>
+      <div class="label">Missing files</div>
+      <div class="hint">Documents marked file_exists = false</div>
+    </div>
+  </div>
+
+  {% if stats.integrity_by_issue %}
+  <div class="panel">
+    <h2>Integrity failures by issue type</h2>
+    <ul class="issue-list">
+      {% for row in stats.integrity_by_issue %}
+      <li>
+        <span>{{ row.issue_type }}</span>
+        <strong>{{ row.count }}</strong>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="sub" style="margin:12px 0 0;"><a href="{% url 'issuer:integritylog-list' %}">View all integrity logs →</a></p>
+  </div>
+  {% endif %}
+
+  <div class="dashboard-grid">
+    <div class="panel">
+      <h2>Recent access logs</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Txn</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in stats.recent_access_logs %}
+          <tr>
+            <td>{{ log.created_at|date:"m-d H:i" }}</td>
+            <td>{{ log.txn_id|truncatechars:16|default:"—" }}</td>
+            <td>
+              {% if log.response_status == 1 %}
+                <span class="badge-ok">OK</span>
+              {% else %}
+                <span class="badge-err">{{ log.response_status }}</span>
+              {% endif %}
+            </td>
+            <td><a href="{% url 'issuer:accesslog-detail' log.pk %}">View</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4">No access logs yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="sub" style="margin:12px 0 0;"><a href="{% url 'issuer:accesslog-list' %}">All access logs →</a></p>
+    </div>
+
+    <div class="panel">
+      <h2>Recent integrity logs</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Issue</th>
+            <th>Action</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in stats.recent_integrity_logs %}
+          <tr>
+            <td>{{ log.created_at|date:"m-d H:i" }}</td>
+            <td>{{ log.issue_type }}</td>
+            <td>{{ log.action_taken|default:"—" }}</td>
+            <td><a href="{% url 'issuer:integritylog-detail' log.pk %}">View</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4">No integrity logs yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="sub" style="margin:12px 0 0;"><a href="{% url 'issuer:integritylog-list' %}">All integrity logs →</a></p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Quick links</h2>
+    <div class="actions">
+      <a class="btn" href="{% url 'issuer:document-list' %}">Manage documents</a>
+      <a class="btn btn-secondary" href="{% url 'issuer:document-export' %}">Export documents (CSV)</a>
+      <a class="btn btn-secondary" href="{% url 'issuer:accesslog-export' %}">Export access logs (CSV)</a>
+      <a class="btn btn-secondary" href="{% url 'issuer:integritylog-export' %}">Export integrity logs (CSV)</a>
+    </div>
+  </div>
+{% endblock %}
