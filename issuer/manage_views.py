@@ -15,7 +15,12 @@ from django.views.decorators.http import require_http_methods
 
 from issuer.forms import AccessLogForm, DocumentForm, IntegrityLogForm
 from issuer.models import AccessLog, Document, IntegrityLog
-from issuer.services.file_service import resolve_path
+from issuer.services.file_service import (
+    diagnose_document_file,
+    effective_file_name,
+    find_readable_path,
+    resolve_path,
+)
 
 PAGE_SIZE = 25
 
@@ -92,9 +97,7 @@ def manage_hub(request):
 
 
 def _document_file_available(doc: Document) -> bool:
-    if not (doc.file_name or "").strip():
-        return False
-    return os.path.isfile(resolve_path(doc))
+    return find_readable_path(doc) is not None
 
 
 def document_list(request):
@@ -139,22 +142,25 @@ def document_detail(request, pk):
 def document_view_file(request, pk):
     """Serve the stored document file for in-browser preview (manage UI only)."""
     doc = get_object_or_404(Document, pk=pk)
-    if not _document_file_available(doc):
+    full_path = find_readable_path(doc)
+    if not full_path:
         return render(
             request,
             "issuer/manage/document_file_unavailable.html",
-            {"object": doc, "expected_path": resolve_path(doc)},
+            {
+                "object": doc,
+                "expected_path": resolve_path(doc),
+                "file_debug": diagnose_document_file(doc),
+            },
             status=404,
         )
-
-    full_path = resolve_path(doc)
     with open(full_path, "rb") as f:
         content = f.read()
 
     content_type, _ = mimetypes.guess_type(full_path)
     if not content_type:
         content_type = "application/pdf"
-    filename = os.path.basename(doc.file_name) or f"document-{doc.pk}.pdf"
+    filename = os.path.basename(effective_file_name(doc.file_name)) or f"document-{doc.pk}.pdf"
     response = HttpResponse(content, content_type=content_type)
     response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response

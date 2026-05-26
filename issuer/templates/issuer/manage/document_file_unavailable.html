@@ -7,10 +7,54 @@
     <p style="margin:0 0 12px;">The file could not be opened for preview.</p>
     {% if object.file_name %}
     <p><strong>Stored file name:</strong> {{ object.file_name }}</p>
-    <p><strong>Expected path:</strong> {{ expected_path }}</p>
+    <p><strong>Primary expected path:</strong> {{ expected_path }}</p>
     {% else %}
     <p>No <code>file_name</code> is stored for this record.</p>
     {% endif %}
+
+    {% if file_debug %}
+    <h2 style="margin:24px 0 12px;font-size:1rem;">Path diagnostics (from app server)</h2>
+    <dl class="detail-grid">
+      <dt>BASE_STORAGE_PATH</dt>
+      <dd><code>{{ file_debug.base_storage_path }}</code></dd>
+      <dt>Base is directory</dt><dd>{{ file_debug.base_is_dir }}</dd>
+      <dt>Base readable</dt><dd>{{ file_debug.base_readable }}</dd>
+      <dt>Stored file name (normalized)</dt><dd><code>{{ file_debug.normalized_file_name }}</code></dd>
+      <dt>Resolved file name</dt><dd><code>{{ file_debug.effective_file_name }}</code></dd>
+      <dt>Resolved path</dt>
+      <dd>{% if file_debug.resolved_path %}<code>{{ file_debug.resolved_path }}</code>{% else %}— (none found){% endif %}</dd>
+    </dl>
+    {% if file_debug.candidates %}
+    <table style="margin-top:16px;">
+      <thead>
+        <tr><th>Candidate path</th><th>Exists</th><th>Is file</th><th>Readable</th></tr>
+      </thead>
+      <tbody>
+        {% for row in file_debug.candidates %}
+        <tr>
+          <td><code>{{ row.path }}</code></td>
+          <td>{{ row.exists }}</td>
+          <td>{{ row.is_file }}</td>
+          <td>{{ row.readable }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    {% if file_debug.matching_entries %}
+    <p style="margin-top:16px;"><strong>Files in base folder matching name prefix:</strong></p>
+    <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;">
+      {% for entry in file_debug.matching_entries %}
+      <li><code>{{ entry }}</code></li>
+      {% endfor %}
+    </ul>
+    {% elif file_debug.list_error %}
+    <p style="margin-top:16px;color:#9a3412;"><strong>Could not list storage folder:</strong> {{ file_debug.list_error }}</p>
+    {% else %}
+    <p style="margin-top:16px;">No matching filenames found in the storage folder (prefix search).</p>
+    {% endif %}
+    {% endif %}
+
     <div class="actions" style="margin-top:18px;">
       <a class="btn" href="{% url 'issuer:document-detail' object.pk %}">Back to details</a>
       <a class="btn btn-outline" href="{% url 'issuer:document-list' %}">Back to list</a>

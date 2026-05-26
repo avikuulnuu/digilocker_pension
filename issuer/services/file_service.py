@@ -23,9 +23,108 @@ class IntegrityCheckError(Exception):
     pass
 
 
+def _storage_base() -> str:
+    return (settings.DIGILOCKER_BASE_STORAGE_PATH or "").rstrip("/\\")
+
+
+def _normalize_file_name(file_name: str) -> str:
+    """Strip whitespace; use relative path under storage base only."""
+    name = (file_name or "").strip().replace("\\", "/")
+    while name.startswith("./"):
+        name = name[2:]
+    return name.lstrip("/")
+
+
+def effective_file_name(file_name: str) -> str:
+    """Return file_name with .pdf appended when no extension is present."""
+    name = _normalize_file_name(file_name)
+    if not name:
+        return ""
+    if not os.path.splitext(name)[1]:
+        return f"{name}.pdf"
+    return name
+
+
+def candidate_paths(doc: Document) -> list[str]:
+    """Absolute paths to try for this document (prefers .pdf when extension omitted)."""
+    base = _storage_base()
+    raw = _normalize_file_name(doc.file_name)
+    if not base or not raw:
+        return []
+
+    effective = effective_file_name(doc.file_name)
+    paths = [os.path.join(base, effective)]
+    if effective != raw:
+        paths.append(os.path.join(base, raw))
+        paths.append(os.path.join(base, f"{raw}.PDF"))
+
+    seen = set()
+    unique = []
+    for path in paths:
+        if path not in seen:
+            seen.add(path)
+            unique.append(path)
+    return unique
+
+
 def resolve_path(doc: Document) -> str:
-    """Resolve absolute path from base config + relative path."""
-    return os.path.join(settings.DIGILOCKER_BASE_STORAGE_PATH, doc.file_name)
+    """Primary expected absolute path (uses effective_file_name)."""
+    base = _storage_base()
+    name = effective_file_name(doc.file_name)
+    if not base or not name:
+        return os.path.join(base or "", name or "")
+    return os.path.join(base, name)
+
+
+def find_readable_path(doc: Document) -> str | None:
+    """Return the first candidate path that exists and is readable, or None."""
+    for path in candidate_paths(doc):
+        if os.path.isfile(path) and os.access(path, os.R_OK):
+            return path
+    return None
+
+
+def diagnose_document_file(doc: Document) -> dict:
+    """Build diagnostics for manage UI / staging troubleshooting."""
+    base = _storage_base()
+    name = _normalize_file_name(doc.file_name)
+    effective = effective_file_name(doc.file_name)
+    candidates = []
+    for path in candidate_paths(doc):
+        exists = os.path.exists(path)
+        candidates.append({
+            "path": path,
+            "exists": exists,
+            "is_file": os.path.isfile(path),
+            "readable": os.access(path, os.R_OK) if exists else False,
+        })
+
+    matching = []
+    list_error = ""
+    if base and name and os.path.isdir(base):
+        try:
+            prefixes = {os.path.basename(name), os.path.basename(effective)}
+            for entry in sorted(os.listdir(base)):
+                if entry in prefixes or any(entry.startswith(p) for p in prefixes):
+                    matching.append(entry)
+                if len(matching) >= 15:
+                    break
+        except OSError as exc:
+            list_error = str(exc)
+    elif base and not os.path.isdir(base):
+        list_error = "BASE_STORAGE_PATH is not a directory from this process"
+
+    return {
+        "base_storage_path": base,
+        "base_is_dir": os.path.isdir(base) if base else False,
+        "base_readable": os.access(base, os.R_OK) if base and os.path.isdir(base) else False,
+        "normalized_file_name": name,
+        "effective_file_name": effective,
+        "candidates": candidates,
+        "matching_entries": matching,
+        "list_error": list_error,
+        "resolved_path": find_readable_path(doc),
+    }
 
 
 def compute_checksum(file_path: str) -> str:
@@ -46,20 +145,23 @@ def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digi
     Returns file content bytes on success.
     Raises FileNotAvailableError or IntegrityCheckError in STRICT mode.
     """
-    full_path = resolve_path(doc)
+    full_path = find_readable_path(doc)
     mode = settings.DIGILOCKER_INTEGRITY_MODE
 
     # Check existence
-    if not os.path.isfile(full_path):
+    if not full_path:
+        expected = resolve_path(doc)
+        tried = ", ".join(candidate_paths(doc))
         stage_failed(
             "file_read",
             f"File not found on disk: {doc.file_name}",
             document_id=doc.pk,
-            path=full_path,
+            path=expected,
+            tried_paths=tried,
             digilocker_txn=digilocker_txn,
         )
         _log_integrity(
-            doc, full_path, "FILE_MISSING", "", "", mode,
+            doc, expected, "FILE_MISSING", "", "", mode,
             extra_context={
                 "request_ip": request_ip,
                 "digilocker_txn": digilocker_txn,

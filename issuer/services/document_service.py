@@ -2,12 +2,12 @@
 
 import base64
 import logging
-import os
 
 from issuer.models import Document
 from issuer.services.file_service import (
     FileNotAvailableError,
     IntegrityCheckError,
+    find_readable_path,
     read_file_bytes,
     resolve_path,
 )
@@ -118,19 +118,20 @@ def lookup_document(request_data: PullURIRequestData, *, txn: str = "") -> Docum
             authorization_number=authorization_number,
         )
 
-    full_path = resolve_path(doc)
-    if not os.path.isfile(full_path):
+    full_path = find_readable_path(doc)
+    if not full_path:
+        expected = resolve_path(doc)
         _fail_file_unavailable(
             "FILE_MISSING_ON_DISK",
             (
                 f"Document record found (id={doc.pk}) but file '{doc.file_name}' "
-                f"was not found at expected path '{full_path}' "
-                f"(file_exists={doc.file_exists})"
+                f"was not found under storage (tried including .pdf). "
+                f"Primary expected path: '{expected}' (file_exists={doc.file_exists})"
             ),
             txn=txn,
             document_id=doc.pk,
             file_name=doc.file_name,
-            expected_path=full_path,
+            expected_path=expected,
             file_exists_flag=doc.file_exists,
             authorization_number=authorization_number,
         )
