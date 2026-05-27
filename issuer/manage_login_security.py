@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from django.conf import settings
 from django.core.cache import cache
 
@@ -32,11 +34,19 @@ def get_failure_count(request) -> int:
 
 
 def is_locked(request) -> tuple[bool, int]:
-    """Return (locked, seconds_remaining)."""
-    ttl = cache.ttl(_lock_cache_key(request))
-    if ttl is None or ttl <= 0:
+    """Return (locked, seconds_remaining). Works with LocMemCache (no cache.ttl)."""
+    lock_until = cache.get(_lock_cache_key(request))
+    if lock_until is None:
         return False, 0
-    return True, ttl
+    try:
+        remaining = int(float(lock_until) - time.time())
+    except (TypeError, ValueError):
+        cache.delete(_lock_cache_key(request))
+        return False, 0
+    if remaining <= 0:
+        cache.delete(_lock_cache_key(request))
+        return False, 0
+    return True, remaining
 
 
 def record_failed_login(request) -> int:
@@ -54,7 +64,11 @@ def record_failed_login(request) -> int:
 
     max_failures = settings.MANAGE_LOGIN_MAX_FAILURES
     if count >= max_failures:
-        cache.set(lock_key, True, timeout=lockout_seconds)
+        cache.set(
+            lock_key,
+            time.time() + lockout_seconds,
+            timeout=lockout_seconds,
+        )
     return count
 
 
