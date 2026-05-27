@@ -20,15 +20,31 @@
       .field { margin-bottom: 16px; }
       .field label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
       .field input { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
+      .captcha-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+      .captcha-row img { border-radius: 6px; border: 1px solid #e2e8f0; }
+      .captcha-row input { width: 8rem; flex: 0 0 auto; }
       .btn { width: 100%; background: #2563eb; color: #fff; border: none; padding: 12px; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 600; }
       .errors { color: #dc2626; font-size: 14px; margin-bottom: 16px; }
-      .messages { list-style: none; margin: 0 0 16px; padding: 12px; background: #fef2f2; border-radius: 8px; color: #b91c1c; font-size: 14px; }
+      .messages { list-style: none; margin: 0 0 16px; padding: 12px; border-radius: 8px; font-size: 14px; }
+      .messages li { margin: 0; }
+      .messages:has(li) { background: #fef2f2; color: #b91c1c; }
+      .warn { background: #fffbeb; color: #92400e; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+      .hint { color: #64748b; font-size: 12px; margin-top: 6px; }
     </style>
   </head>
   <body>
     <div class="card">
       <h1>Management console</h1>
       <p class="sub">DigiLocker Issuer — sign in with an authorized staff account.</p>
+
+      {% if failed_attempts %}
+      <p class="warn">
+        Failed sign-in attempts from your network: {{ failed_attempts }} of {{ max_failures }}.
+        {% if attempts_remaining %}
+        {{ attempts_remaining }} attempt(s) left before a {{ lockout_minutes }}-minute lockout.
+        {% endif %}
+      </p>
+      {% endif %}
 
       {% if messages %}
       <ul class="messages">
@@ -46,11 +62,19 @@
         {% csrf_token %}
         <div class="field">
           <label for="id_username">Username</label>
-          <input type="text" name="username" id="id_username" autofocus required />
+          <input type="text" name="username" id="id_username" value="{{ form.username.value|default:'' }}" autofocus required />
         </div>
         <div class="field">
           <label for="id_password">Password</label>
           <input type="password" name="password" id="id_password" required />
+        </div>
+        <div class="field">
+          <label for="id_captcha_1">Security check</label>
+          <div class="captcha-row">
+            {{ form.captcha }}
+          </div>
+          {% if form.captcha.errors %}<div class="errors">{{ form.captcha.errors }}</div>{% endif %}
+          <p class="hint">Solve the arithmetic problem shown. Click the image to get a new one.</p>
         </div>
         {% if form.username.errors %}<div class="errors">{{ form.username.errors }}</div>{% endif %}
         {% if form.password.errors %}<div class="errors">{{ form.password.errors }}</div>{% endif %}

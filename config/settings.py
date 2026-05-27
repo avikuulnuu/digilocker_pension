@@ -16,6 +16,11 @@ env = environ.Env(
     MAX_FILE_SIZE_MB=(int, 10),
     REQUEST_TIMEOUT_MS=(int, 5000),
     TIMESTAMP_SKEW_SECONDS=(int, 300),
+    ISSUER_VERBOSE_LOGGING=(bool, False),
+    MANAGE_LOGIN_MAX_FAILURES=(int, 5),
+    MANAGE_LOGIN_LOCKOUT_MINUTES=(int, 15),
+    SECURE_SSL_REDIRECT=(bool, True),
+    SESSION_COOKIE_SECURE=(bool, True),
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
@@ -31,6 +36,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.postgres",
+    "captcha",
     "issuer",
 ]
 
@@ -62,6 +68,12 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
+}
 
 database_url = env("DATABASE_URL", default=None)
 if database_url:
@@ -118,17 +130,30 @@ DIGILOCKER_MAX_FILE_SIZE_MB = env("MAX_FILE_SIZE_MB")
 DIGILOCKER_REQUEST_TIMEOUT_MS = env("REQUEST_TIMEOUT_MS")
 DIGILOCKER_TIMESTAMP_SKEW_SECONDS = env("TIMESTAMP_SKEW_SECONDS")
 
+ISSUER_VERBOSE_LOGGING = env("ISSUER_VERBOSE_LOGGING")
+
+# --- Management console login protection ---
+MANAGE_LOGIN_MAX_FAILURES = env("MANAGE_LOGIN_MAX_FAILURES")
+MANAGE_LOGIN_LOCKOUT_MINUTES = env("MANAGE_LOGIN_LOCKOUT_MINUTES")
+CAPTCHA_CHALLENGE_FUNCT = "captcha.helpers.math_challenge"
+CAPTCHA_FONT_SIZE = 28
+CAPTCHA_LENGTH = 4
+
 # --- Security Hardening ---
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = "DENY"
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    # Trust X-Forwarded-Proto from Nginx when TLS terminates at the proxy.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = env("SECURE_SSL_REDIRECT")
+    SESSION_COOKIE_SECURE = env("SESSION_COOKIE_SECURE")
+    CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
+    if SECURE_SSL_REDIRECT:
+        SECURE_HSTS_SECONDS = 31536000
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        SECURE_HSTS_PRELOAD = True
 
 LOGGING = {
     "version": 1,
@@ -148,7 +173,7 @@ LOGGING = {
     "loggers": {
         "issuer": {
             "handlers": ["console"],
-            "level": "DEBUG" if DEBUG else "INFO",
+            "level": "DEBUG" if (DEBUG or ISSUER_VERBOSE_LOGGING) else "INFO",
             "propagate": False,
         },
         "django": {
