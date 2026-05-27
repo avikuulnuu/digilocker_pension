@@ -86,6 +86,7 @@ class ManagePortalAuthTest(TestCase):
         response = self._post_login("ops_user", "test-pass-123")
         self.assertRedirects(response, self.hub_url, fetch_redirect_response=False)
 
+    @override_settings(MANAGE_DECODE_PDF_ENABLED=True)
     def test_decode_pdf_requires_auth(self):
         url = reverse("issuer:decode-pdf-tool")
         response = self.client.get(url)

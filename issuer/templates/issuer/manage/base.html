@@ -167,7 +167,9 @@
           <a href="{% url 'issuer:accesslog-list' %}" class="{% if 'accesslog' in name %}active{% endif %}">Access Logs</a>
           <a href="{% url 'issuer:integritylog-list' %}" class="{% if 'integritylog' in name %}active{% endif %}">Integrity Logs</a>
           <a href="{% url 'issuer:kpi-report' %}" class="{% if 'kpi-report' in name %}active{% endif %}">KPI Report</a>
+          {% if manage_decode_pdf_enabled %}
           <a href="{% url 'issuer:decode-pdf-tool' %}" class="{% if 'decode-pdf' in name %}active{% endif %}">Decode PDF</a>
+          {% endif %}
           {% endwith %}
           <div class="sidebar-account">
             <div class="account-label">Account</div>

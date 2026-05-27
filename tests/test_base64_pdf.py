@@ -6,7 +6,7 @@ import re
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from issuer.models import Document
@@ -50,6 +50,7 @@ class Base64PdfServiceTest(TestCase):
         self.assertIn("size limit", str(ctx.exception))
 
 
+@override_settings(MANAGE_DECODE_PDF_ENABLED=True)
 class DecodePdfManageViewTest(TestCase):
     def setUp(self):
         _login_manage_portal(self.client)
@@ -85,3 +86,19 @@ class DecodePdfManageViewTest(TestCase):
         anonymous = self.client_class()
         response = anonymous.get(reverse("issuer:decode-pdf-tool"))
         self.assertEqual(response.status_code, 302)
+
+
+@override_settings(MANAGE_DECODE_PDF_ENABLED=False)
+class DecodePdfDisabledTest(TestCase):
+    def setUp(self):
+        _login_manage_portal(self.client)
+
+    def test_tool_returns_404_when_disabled(self):
+        response = self.client.get(reverse("issuer:decode-pdf-tool"))
+        self.assertEqual(response.status_code, 404)
+
+    def test_view_returns_404_when_disabled(self):
+        response = self.client.get(
+            reverse("issuer:decode-pdf-view", kwargs={"token": "abc123"})
+        )
+        self.assertEqual(response.status_code, 404)
