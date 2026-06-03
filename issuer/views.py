@@ -54,7 +54,7 @@ def _get_client_ip(request):
 @csrf_exempt
 @ratelimit(key="ip", rate="60/m", method="POST", block=True)
 def pull_uri_view(request):
-    """POST /issuer/pull-uri — DigiLocker Pull URI Request API."""
+    """POST /api/pulluri — DigiLocker Pull URI Request API."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
 
@@ -250,7 +250,7 @@ def pull_uri_view(request):
 @csrf_exempt
 @ratelimit(key="ip", rate="60/m", method="GET", block=True)
 def document_fetch_view(request, uri):
-    """GET /issuer/document/<uri> — Fetch document PDF by URI."""
+    """GET /api/document/<uri> — Fetch document PDF by URI."""
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
 

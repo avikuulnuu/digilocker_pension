@@ -1,12 +1,10 @@
 from django.urls import path
 
-from issuer import manage_auth, manage_views, views
+from issuer import manage_auth, manage_views
 
 app_name = "issuer"
 
 urlpatterns = [
-    path("pull-uri", views.pull_uri_view, name="pull-uri"),
-    path("document/<path:uri>", views.document_fetch_view, name="document-fetch"),
     # Management console (login/logout are public; all other manage routes require auth)
     path("manage/login/", manage_auth.ManagePortalLoginView.as_view(), name="manage-login"),
     path("manage/logout/", manage_auth.manage_logout, name="manage-logout"),

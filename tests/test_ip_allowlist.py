@@ -52,7 +52,7 @@ class RestrictedAdminIPMiddlewareTest(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_allows_api_paths_without_restriction(self):
-        request = RequestFactory().post("/issuer/pull-uri")
+        request = RequestFactory().post("/api/pulluri")
         request.META["REMOTE_ADDR"] = "203.0.113.50"
         response = self.middleware(request)
         self.assertEqual(response.status_code, 200)

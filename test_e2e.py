@@ -58,7 +58,7 @@ def test_pull_uri():
     hmac_sig = sign_body(body)
 
     resp = requests.post(
-        f"{BASE_URL}/issuer/pull-uri",
+        f"{BASE_URL}/api/pulluri",
         data=body,
         headers={
             "Content-Type": "application/xml",
@@ -95,7 +95,7 @@ def test_pull_uri_no_hmac():
     )
 
     resp = requests.post(
-        f"{BASE_URL}/issuer/pull-uri",
+        f"{BASE_URL}/api/pulluri",
         data=body,
         headers={"Content-Type": "application/xml"},
     )
@@ -138,7 +138,7 @@ def test_pull_uri_wrong_doc():
     hmac_sig = sign_body(body)
 
     resp = requests.post(
-        f"{BASE_URL}/issuer/pull-uri",
+        f"{BASE_URL}/api/pulluri",
         data=body,
         headers={
             "Content-Type": "application/xml",
@@ -186,7 +186,7 @@ def test_pull_uri_wrong_identity():
     hmac_sig = sign_body(body)
 
     resp = requests.post(
-        f"{BASE_URL}/issuer/pull-uri",
+        f"{BASE_URL}/api/pulluri",
         data=body,
         headers={
             "Content-Type": "application/xml",

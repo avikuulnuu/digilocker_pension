@@ -26,7 +26,7 @@ class PullURIViewTest(TestCase):
         self.doc.digilocker_doc_id = "TESTDOC01"
         self.doc.digilocker_uri = "issuer-PPO-TESTDOC01"
         self.doc.save(update_fields=["digilocker_doc_id", "digilocker_uri"])
-        url = f"/issuer/document/{self.doc.digilocker_uri}?mobile=8888888888"
+        url = f"/api/document/{self.doc.digilocker_uri}?mobile=8888888888"
         hmac_sig = "dummyhmac"  # bypassed in test
         with patch("issuer.views.read_file_bytes", return_value=b"PDFDATA"):
             with patch("issuer.views.Document.objects.get", return_value=self.doc):
@@ -96,7 +96,7 @@ class PullURIViewTest(TestCase):
         hmac_sig = self._make_signed_request(body)
 
         response = self.client.post(
-            "/issuer/pull-uri",
+            "/api/pulluri",
             data=body,
             content_type="application/xml",
             HTTP_X_DIGILOCKER_HMAC=hmac_sig,
@@ -131,7 +131,7 @@ class PullURIViewTest(TestCase):
         hmac_sig = self._make_signed_request(body)
 
         response = self.client.post(
-            "/issuer/pull-uri",
+            "/api/pulluri",
             data=body,
             content_type="application/xml",
             HTTP_X_DIGILOCKER_HMAC=hmac_sig,
@@ -164,7 +164,7 @@ class PullURIViewTest(TestCase):
         hmac_sig = self._make_signed_request(body)
 
         response = self.client.post(
-            "/issuer/pull-uri",
+            "/api/pulluri",
             data=body,
             content_type="application/xml",
             HTTP_X_DIGILOCKER_HMAC=hmac_sig,
@@ -182,12 +182,12 @@ class PullURIViewTest(TestCase):
             b"</DocDetails></PullURIRequest>"
         )
         response = self.client.post(
-            "/issuer/pull-uri",
+            "/api/pulluri",
             data=body,
             content_type="application/xml",
         )
         self.assertEqual(response.status_code, 401)
 
     def test_pull_uri_get_not_allowed(self):
-        response = self.client.get("/issuer/pull-uri")
+        response = self.client.get("/api/pulluri")
         self.assertEqual(response.status_code, 405)
