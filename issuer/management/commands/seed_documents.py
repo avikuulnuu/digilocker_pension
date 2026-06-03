@@ -20,7 +20,10 @@ class Command(BaseCommand):
             return
 
         for doc in DOCS:
-            file_path = os.path.join(base_path, doc["file_name"])
+            disk_name = effective_file_name(
+                doc["file_name"], document_type=doc["document_type"]
+            )
+            file_path = os.path.join(base_path, disk_name)
             if not os.path.exists(file_path):
                 self.stderr.write(f"File not found: {file_path}")
                 continue

@@ -23,8 +23,23 @@ class IntegrityCheckError(Exception):
     pass
 
 
-def _storage_base() -> str:
-    return (settings.DIGILOCKER_BASE_STORAGE_PATH or "").rstrip("/\\")
+def storage_base_for_document_type(document_type: str) -> str:
+    """Return the configured storage root for the given document type."""
+    if (document_type or "").upper() == "GPF":
+        base = settings.DIGILOCKER_GPF_STORAGE_PATH
+    else:
+        base = settings.DIGILOCKER_BASE_STORAGE_PATH
+    return (base or "").rstrip("/\\")
+
+
+def _storage_env_var_for_document_type(document_type: str) -> str:
+    if (document_type or "").upper() == "GPF":
+        return "GPF_STORAGE_PATH"
+    return "BASE_STORAGE_PATH"
+
+
+def _storage_base_for_document(doc: Document) -> str:
+    return storage_base_for_document_type(doc.document_type)
 
 
 def _normalize_file_name(file_name: str) -> str:
@@ -35,28 +50,37 @@ def _normalize_file_name(file_name: str) -> str:
     return name.lstrip("/")
 
 
-def effective_file_name(file_name: str) -> str:
-    """Return file_name with .pdf appended when no extension is present."""
+def _db_file_stem(file_name: str) -> str:
+    """Return the base file name stored in the database (no PDF suffix)."""
     name = _normalize_file_name(file_name)
-    if not name:
-        return ""
-    if not os.path.splitext(name)[1]:
-        return f"{name}.pdf"
+    lower = name.lower()
+    if lower.endswith("_signed.pdf"):
+        return name[: -len("_signed.pdf")]
+    if lower.endswith(".pdf"):
+        return name[: -len(".pdf")]
     return name
 
 
+def effective_file_name(file_name: str, *, document_type: str = "") -> str:
+    """Map DB file_name stem to the on-disk PDF filename."""
+    stem = _db_file_stem(file_name)
+    if not stem:
+        return ""
+    if (document_type or "").upper() == "GPF":
+        return f"{stem}.pdf"
+    return f"{stem}_signed.pdf"
+
+
 def candidate_paths(doc: Document) -> list[str]:
-    """Absolute paths to try for this document (prefers .pdf when extension omitted)."""
-    base = _storage_base()
-    raw = _normalize_file_name(doc.file_name)
-    if not base or not raw:
+    """Absolute paths to try for this document on disk."""
+    base = _storage_base_for_document(doc)
+    effective = effective_file_name(doc.file_name, document_type=doc.document_type)
+    if not base or not effective:
         return []
 
-    effective = effective_file_name(doc.file_name)
     paths = [os.path.join(base, effective)]
-    if effective != raw:
-        paths.append(os.path.join(base, raw))
-        paths.append(os.path.join(base, f"{raw}.PDF"))
+    if effective.endswith(".pdf"):
+        paths.append(os.path.join(base, f"{effective[:-4]}.PDF"))
 
     seen = set()
     unique = []
@@ -69,8 +93,8 @@ def candidate_paths(doc: Document) -> list[str]:
 
 def resolve_path(doc: Document) -> str:
     """Primary expected absolute path (uses effective_file_name)."""
-    base = _storage_base()
-    name = effective_file_name(doc.file_name)
+    base = _storage_base_for_document(doc)
+    name = effective_file_name(doc.file_name, document_type=doc.document_type)
     if not base or not name:
         return os.path.join(base or "", name or "")
     return os.path.join(base, name)
@@ -86,9 +110,10 @@ def find_readable_path(doc: Document) -> str | None:
 
 def diagnose_document_file(doc: Document) -> dict:
     """Build diagnostics for manage UI / staging troubleshooting."""
-    base = _storage_base()
-    name = _normalize_file_name(doc.file_name)
-    effective = effective_file_name(doc.file_name)
+    base = _storage_base_for_document(doc)
+    name = _db_file_stem(doc.file_name)
+    effective = effective_file_name(doc.file_name, document_type=doc.document_type)
+    storage_env_var = _storage_env_var_for_document_type(doc.document_type)
     candidates = []
     for path in candidate_paths(doc):
         exists = os.path.exists(path)
@@ -112,9 +137,10 @@ def diagnose_document_file(doc: Document) -> dict:
         except OSError as exc:
             list_error = str(exc)
     elif base and not os.path.isdir(base):
-        list_error = "BASE_STORAGE_PATH is not a directory from this process"
+        list_error = f"{storage_env_var} is not a directory from this process"
 
     return {
+        "storage_env_var": storage_env_var,
         "base_storage_path": base,
         "base_is_dir": os.path.isdir(base) if base else False,
         "base_readable": os.access(base, os.R_OK) if base and os.path.isdir(base) else False,

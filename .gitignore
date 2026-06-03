@@ -101,7 +101,9 @@ digilocker_postman_automation.zip
 
 # Documents storage (keep the directory, ignore contents)
 data/docs/*
+data/gpf/*
 !data/docs/.gitkeep
+!data/gpf/.gitkeep
 
 # Logs
 logs/

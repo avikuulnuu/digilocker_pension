@@ -7,7 +7,7 @@ from issuer.models import Document
 from issuer.services.file_service import (
     FileNotAvailableError,
     IntegrityCheckError,
-    effective_file_name,
+    _db_file_stem,
     find_readable_path,
     read_file_bytes,
     resolve_path,
@@ -147,8 +147,8 @@ def lookup_document(request_data: PullURIRequestData, *, txn: str = "") -> Docum
         _fail_file_unavailable(
             "FILE_MISSING_ON_DISK",
             (
-                f"Document record found (id={doc.pk}) but file '{doc.file_name}' "
-                f"was not found under storage (tried including .pdf). "
+                f"Document record found (id={doc.pk}) but on-disk file for "
+                f"'{doc.file_name}' was not found under storage. "
                 f"Primary expected path: '{expected}' (file_exists={doc.file_exists})"
             ),
             txn=txn,

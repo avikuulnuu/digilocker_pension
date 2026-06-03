@@ -37,12 +37,11 @@ class PullURIViewTest(TestCase):
         self.assertEqual(log.file_path, self.doc.file_name)
         self.assertEqual(log.file_checksum, "abc123")
     def setUp(self):
-        self.tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
-        self.tmp.write(b"%PDF-1.4 test content")
-        self.tmp.close()
-
-        base_path = os.path.dirname(self.tmp.name)
-        rel_path = os.path.basename(self.tmp.name)
+        self.base_path = tempfile.mkdtemp()
+        self.file_stem = "test_auth100_ppo"
+        file_path = os.path.join(self.base_path, f"{self.file_stem}_signed.pdf")
+        with open(file_path, "wb") as f:
+            f.write(b"%PDF-1.4 test content")
 
         self.doc = Document.objects.create(
             authorization_number="AUTH100",
@@ -51,17 +50,20 @@ class PullURIViewTest(TestCase):
             authorization_date=date(2024, 1, 1),
             employee_name="Sunil Kumar",
             employee_dob=date(1990, 12, 31),
-            file_name=rel_path,
+            file_name=self.file_stem,
         )
 
         self._base_path_patcher = patch.object(
-            settings, "DIGILOCKER_BASE_STORAGE_PATH", base_path
+            settings, "DIGILOCKER_BASE_STORAGE_PATH", self.base_path
         )
         self._base_path_patcher.start()
 
     def tearDown(self):
         self._base_path_patcher.stop()
-        os.unlink(self.tmp.name)
+        file_path = os.path.join(self.base_path, f"{self.file_stem}_signed.pdf")
+        if os.path.exists(file_path):
+            os.unlink(file_path)
+        os.rmdir(self.base_path)
 
     def _make_signed_request(self, body: bytes):
         key = settings.DIGILOCKER_API_KEY.encode()
