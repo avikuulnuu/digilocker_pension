@@ -198,7 +198,7 @@ python manage.py test tests -v2
 python manage.py runserver 8000
 
 # Terminal 2: run e2e tests
-python test_e2e.py
+python run_e2e.py
 ```
 
 ---
@@ -243,7 +243,7 @@ digilocker/
 ├── .env.example                 # Config template
 ├── requirements.txt             # Python dependencies
 ├── manage.py
-├── test_e2e.py                  # End-to-end test script
+├── run_e2e.py                   # End-to-end test script (manual; requires running server)
 ├── tests/                       # Test suite
 │   ├── test_authentication.py   # HMAC, KeyHash, timestamp tests
 │   ├── test_xml_parser.py       # XML parsing tests
@@ -308,6 +308,29 @@ python manage.py collectstatic --noinput
 ```
 
 Set `DEBUG=False`, configure a strong `SECRET_KEY`, and enforce HTTPS via Nginx.
+
+### Admin / manage console IP allowlist (production)
+
+`ADMIN_IP_ALLOWLIST` must contain the IP of the **machine making the browser request** (your PC or VPN exit), **not** the server’s own IP. If the server is `10.181.30.97` and you browse from `10.181.30.42`, put `10.181.30.42` (or the office subnet, e.g. `10.181.30.0/24`) in the allowlist — not `10.181.30.97`.
+
+When Gunicorn runs **behind nginx** (typical production), Django’s default `REMOTE_ADDR` is the proxy (`127.0.0.1`), so every user appears as localhost and your workstation IP in the allowlist never matches. Fix:
+
+1. On the server `.env`:
+   ```env
+   DEBUG=False
+   ADMIN_IP_ALLOWLIST=10.181.30.42,10.181.30.0/24
+   TRUST_X_FORWARDED_FOR=True
+   ```
+2. In nginx (inside the `location` that proxies to Gunicorn):
+   ```nginx
+   proxy_set_header Host $host;
+   proxy_set_header X-Real-IP $remote_addr;
+   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+   proxy_set_header X-Forwarded-Proto $scheme;
+   ```
+3. Restart gunicorn/nginx after changing `.env`.
+
+If access is still denied, check the application log for a line like `Restricted admin/manage access denied for client IP '...'` — that string is the IP you must allow (or fix proxy headers if it shows `127.0.0.1` while `TRUST_X_FORWARDED_FOR=True`).
 
 ## Reconstructing a PDF from a Base64 String
 

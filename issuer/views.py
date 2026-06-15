@@ -39,6 +39,7 @@ from issuer.services.pull_doc_log import (
     xml_parsed,
 )
 from issuer.services.xml_parser import XMLParseError, parse_pull_uri_request
+from issuer.log_safety import safe_failure_reason
 
 logger = logging.getLogger("issuer")
 
@@ -150,11 +151,12 @@ def pull_uri_view(request):
 
     except AuthenticationError as exc:
         elapsed = int((time.monotonic() - start_time) * 1000)
-        auth_failed(txn=txn, reason=str(exc), request_ip=request_ip)
+        reason = safe_failure_reason(exc)
+        auth_failed(txn=txn, reason=reason, request_ip=request_ip)
         retrieval_failed(
             endpoint="pull-uri",
             stage="auth",
-            reason=str(exc),
+            reason=reason,
             txn=txn,
             elapsed_ms=elapsed,
             request_ip=request_ip,
@@ -167,7 +169,7 @@ def pull_uri_view(request):
         retrieval_failed(
             endpoint="pull-uri",
             stage="lookup",
-            reason=str(exc),
+            reason=safe_failure_reason(exc),
             reason_code=getattr(exc, "reason_code", ""),
             txn=txn,
             elapsed_ms=elapsed,
@@ -186,7 +188,7 @@ def pull_uri_view(request):
         retrieval_failed(
             endpoint="pull-uri",
             stage="identity",
-            reason=str(exc),
+            reason=safe_failure_reason(exc),
             txn=txn,
             elapsed_ms=elapsed,
         )
@@ -202,7 +204,7 @@ def pull_uri_view(request):
         retrieval_failed(
             endpoint="pull-uri",
             stage="file_read",
-            reason=str(exc),
+            reason=safe_failure_reason(exc),
             txn=txn,
             elapsed_ms=elapsed,
         )
@@ -218,7 +220,7 @@ def pull_uri_view(request):
         retrieval_failed(
             endpoint="pull-uri",
             stage="integrity",
-            reason=str(exc),
+            reason=safe_failure_reason(exc),
             txn=txn,
             elapsed_ms=elapsed,
         )
@@ -286,7 +288,7 @@ def document_fetch_view(request, uri):
             retrieval_failed(
                 endpoint="document-fetch",
                 stage="lookup",
-                reason=f"URI not found: {uri}",
+                reason="URI_NOT_FOUND",
                 uri=uri,
                 elapsed_ms=elapsed,
             )
@@ -327,7 +329,7 @@ def document_fetch_view(request, uri):
         retrieval_failed(
             endpoint="document-fetch",
             stage="file_read",
-            reason=str(exc),
+            reason=safe_failure_reason(exc),
             uri=uri,
             elapsed_ms=elapsed,
         )
@@ -339,7 +341,7 @@ def document_fetch_view(request, uri):
         retrieval_failed(
             endpoint="document-fetch",
             stage="integrity",
-            reason=str(exc),
+            reason=safe_failure_reason(exc),
             uri=uri,
             elapsed_ms=elapsed,
         )
@@ -362,22 +364,12 @@ def document_fetch_view(request, uri):
 
 def _log_access(data: dict, doc, status: int, elapsed_ms: int, error: str = ""):
     """Write an access log entry."""
-    # Log doc and document_type details to help debug DB data errors
     try:
         doc_type_val = data.get("document_type", "") or ""
-        logger.debug(
-            "AccessLog create attempt: doc=%r document_type=%r len=%d authorization_number=%r txn_id=%r",
-            doc,
-            doc_type_val,
-            len(doc_type_val),
-            data.get("authorization_number"),
-            data.get("txn_id"),
-        )
         if len(doc_type_val) > 30:
             logger.warning(
-                "document_type length (%d) exceeds DB max (30): %r",
+                "document_type length (%d) exceeds DB max (30)",
                 len(doc_type_val),
-                doc_type_val,
             )
             doc_type_val = doc_type_val[:30]
         AccessLog.objects.create(

@@ -7,12 +7,26 @@ from typing import Iterable
 
 
 def get_client_ip(request, *, trust_x_forwarded_for: bool) -> str:
-    """Extract the client IP, optionally honoring X-Forwarded-For behind a trusted proxy."""
+    """Extract the client IP, optionally honoring proxy headers behind a trusted reverse proxy."""
     if trust_x_forwarded_for:
         xff = request.META.get("HTTP_X_FORWARDED_FOR")
         if xff:
             return xff.split(",")[0].strip()
+        real_ip = request.META.get("HTTP_X_REAL_IP")
+        if real_ip:
+            return real_ip.strip()
     return (request.META.get("REMOTE_ADDR") or "").strip()
+
+
+def normalize_client_ip(ip_str: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """Parse client IP; map IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1) to IPv4 for allowlist checks."""
+    try:
+        ip = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return None
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+        return ip.ipv4_mapped
+    return ip
 
 
 def parse_ip_allowlist(entries: Iterable[str]) -> list[ipaddress.IPv4Address | ipaddress.IPv6Address | ipaddress.IPv4Network | ipaddress.IPv6Network]:
@@ -35,9 +49,8 @@ def parse_ip_allowlist(entries: Iterable[str]) -> list[ipaddress.IPv4Address | i
 def ip_is_allowed(ip_str: str, allowed: list) -> bool:
     if not allowed:
         return False
-    try:
-        ip = ipaddress.ip_address(ip_str)
-    except ValueError:
+    ip = normalize_client_ip(ip_str)
+    if ip is None:
         return False
     for item in allowed:
         if isinstance(item, (ipaddress.IPv4Network, ipaddress.IPv6Network)):

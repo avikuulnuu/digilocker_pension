@@ -3,6 +3,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -34,6 +35,7 @@ class ManagePortalAuthTest(TestCase):
         )
 
     def setUp(self):
+        cache.clear()
         self.hub_url = reverse("issuer:manage-hub")
         self.login_url = reverse("issuer:manage-login")
 

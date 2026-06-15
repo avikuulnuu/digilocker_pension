@@ -16,6 +16,7 @@ from issuer.services.identity_validator import validate_identity, IdentityMismat
 from issuer.services.pull_doc_log import stage_failed, stage_ok
 from issuer.services.uri_service import ensure_uri
 from issuer.services.xml_parser import PullURIRequestData
+from issuer.log_safety import mask_identifier, mask_path
 
 logger = logging.getLogger("issuer")
 
@@ -29,12 +30,12 @@ class DocumentNotFoundError(Exception):
 
 
 def _fail_lookup(reason_code, message, *, txn="", **context):
-    stage_failed("lookup", message, reason_code=reason_code, txn=txn, **context)
+    stage_failed("lookup", reason_code, reason_code=reason_code, txn=txn, **context)
     raise DocumentNotFoundError(message, reason_code=reason_code)
 
 
 def _fail_file_unavailable(reason_code, message, *, txn="", **context):
-    stage_failed("file_read", message, reason_code=reason_code, txn=txn, **context)
+    stage_failed("file_read", reason_code, reason_code=reason_code, txn=txn, **context)
     raise FileNotAvailableError(message)
 
 
@@ -47,10 +48,10 @@ def lookup_document(request_data: PullURIRequestData, *, txn: str = "") -> Docum
     authorization_number = request_data.udfs.get("UDF1", "").strip()
     doc_type = (request_data.doc_type or "").strip()
     logger.info(
-        "pull_doc.lookup: UDF1=%r doc_type=%r txn=%s",
-        authorization_number,
+        "pull_doc.lookup: starting lookup doc_type=%r txn=%s document_id_hint=%s",
         doc_type,
         txn,
+        mask_identifier(authorization_number) if authorization_number else "",
     )
     if not authorization_number:
         _fail_lookup(
@@ -163,7 +164,7 @@ def lookup_document(request_data: PullURIRequestData, *, txn: str = "") -> Docum
         logger.warning(
             "pull_doc.lookup: file on disk but file_exists=False for doc %d path=%s",
             doc.pk,
-            full_path,
+            mask_path(full_path),
         )
 
     stage_ok(

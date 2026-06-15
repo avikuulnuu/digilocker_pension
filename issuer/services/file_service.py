@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from issuer.models import Document, IntegrityLog
 from issuer.services.pull_doc_log import stage_failed, stage_ok
+from issuer.log_safety import mask_path
 
 logger = logging.getLogger("issuer")
 
@@ -180,7 +181,7 @@ def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digi
         tried = ", ".join(candidate_paths(doc))
         stage_failed(
             "file_read",
-            f"File not found on disk: {doc.file_name}",
+            "FILE_NOT_FOUND",
             document_id=doc.pk,
             path=expected,
             tried_paths=tried,
@@ -279,6 +280,9 @@ def _log_integrity(doc, file_path, issue_type, stored, calculated, mode, extra_c
     )
     logger.warning(
         "Integrity issue: %s for doc %d at %s (action=%s)",
-        issue_type, doc.pk, file_path, action,
+        issue_type,
+        doc.pk,
+        mask_path(file_path),
+        action,
     )
     return action

@@ -8,6 +8,7 @@ from django.conf import settings
 from django.db import transaction
 
 from issuer.models import Document
+from issuer.log_safety import mask_identifier
 
 logger = logging.getLogger("issuer")
 
@@ -49,5 +50,9 @@ def ensure_uri(document_id: int) -> str:
         doc.digilocker_uri = build_uri(doc.document_type, new_doc_id)
         doc.save(update_fields=["digilocker_doc_id", "digilocker_uri", "updated_at"])
 
-        logger.info("Generated URI %s for document %d", doc.digilocker_uri, doc.pk)
+        logger.info(
+            "Generated URI %s for document %d",
+            mask_identifier(doc.digilocker_uri),
+            doc.pk,
+        )
         return doc.digilocker_uri

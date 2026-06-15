@@ -21,32 +21,13 @@ def verify_hmac(raw_body: bytes, received_hmac: str) -> None:
 
     Uses constant-time comparison to prevent timing attacks.
     """
-    # Log the exact body bytes at entry point before any computation
-    try:
-        body_b64 = base64.b64encode(raw_body).decode("utf-8")
-        logger.debug("HMAC verify entry: body_len=%d body_b64_start=%s", len(raw_body), body_b64[:100])
-    except Exception as e:
-        logger.debug("HMAC verify entry: body_len=%d error_logging_body=%s", len(raw_body), str(e))
-    
     api_key = settings.DIGILOCKER_API_KEY.encode("utf-8")
     computed = base64.b64encode(
         hmac_mod.new(api_key, raw_body, hashlib.sha256).digest()
     ).decode("utf-8")
 
-    # Temporary debug logging to help diagnose mismatches. Remove when finished.
-    try:
-        body_b64 = base64.b64encode(raw_body).decode("utf-8")
-    except Exception:
-        body_b64 = "<unable to base64-encode>"
-    logger.debug("HMAC debug: received=%s computed=%s body_b64=%s", received_hmac, computed, body_b64)
-
     if not hmac_mod.compare_digest(computed, received_hmac):
-        logger.warning(
-            "HMAC verification failed: received=%s computed=%s body_len=%d",
-            received_hmac,
-            computed,
-            len(raw_body),
-        )
+        logger.warning("HMAC verification failed (body_len=%d)", len(raw_body))
         raise AuthenticationError("Invalid HMAC signature")
 
 
@@ -54,8 +35,6 @@ def verify_keyhash(keyhash: str, timestamp_str: str) -> None:
     """Verify KeyHash = SHA256(API_KEY + timestamp)."""
     api_key = settings.DIGILOCKER_API_KEY
     expected = hashlib.sha256((api_key + timestamp_str).encode("utf-8")).hexdigest()
-    # Temporary debug logging to help diagnose KeyHash mismatches.
-    logger.debug("KeyHash debug: received=%s expected=%s timestamp=%s", keyhash, expected, timestamp_str)
     if not hmac_mod.compare_digest(expected, keyhash):
         logger.warning("KeyHash verification failed")
         raise AuthenticationError("Invalid KeyHash")
@@ -72,7 +51,7 @@ def verify_timestamp(timestamp_str: str) -> None:
     now = timezone.now()
     skew = timedelta(seconds=settings.DIGILOCKER_TIMESTAMP_SKEW_SECONDS)
     if abs(now - request_time) > skew:
-        logger.warning("Request timestamp outside allowed skew: %s", timestamp_str)
+        logger.warning("Request timestamp outside allowed skew window")
         raise AuthenticationError("Request timestamp expired or too far in the future")
 
 
@@ -87,5 +66,5 @@ def authenticate_request(raw_body: bytes, hmac_header: str, keyhash: str,
     # verify_timestamp(timestamp_str) # Optional: enable if you want to enforce timestamp validity
 
     if org_id and org_id != settings.DIGILOCKER_ISSUER_ID:
-        logger.warning("orgId mismatch: received=%s expected=%s", org_id, settings.DIGILOCKER_ISSUER_ID)
+        logger.warning("orgId mismatch for request")
         raise AuthenticationError("orgId does not match issuer")

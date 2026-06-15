@@ -17,6 +17,9 @@ env = environ.Env(
     REQUEST_TIMEOUT_MS=(int, 5000),
     TIMESTAMP_SKEW_SECONDS=(int, 300),
     ISSUER_VERBOSE_LOGGING=(bool, False),
+    ISSUER_API_LOG_PATH=(str, ""),
+    ISSUER_API_LOG_MAX_BYTES=(int, 10 * 1024 * 1024),
+    ISSUER_API_LOG_BACKUP_COUNT=(int, 10),
     MANAGE_LOGIN_MAX_FAILURES=(int, 5),
     MANAGE_LOGIN_LOCKOUT_MINUTES=(int, 15),
     SECURE_SSL_REDIRECT=(bool, True),
@@ -122,6 +125,32 @@ TRUST_X_FORWARDED_FOR = env("TRUST_X_FORWARDED_FOR")
 RESTRICTED_ADMIN_IP_ALLOWLIST = env.list("ADMIN_IP_ALLOWLIST")
 if not RESTRICTED_ADMIN_IP_ALLOWLIST and (DEBUG or "test" in sys.argv):
     RESTRICTED_ADMIN_IP_ALLOWLIST = ["127.0.0.1", "::1"]
+elif DEBUG or "test" in sys.argv:
+    for _localhost in ("127.0.0.1", "::1"):
+        if _localhost not in RESTRICTED_ADMIN_IP_ALLOWLIST:
+            RESTRICTED_ADMIN_IP_ALLOWLIST.append(_localhost)
+
+from config.ip_allowlist import parse_ip_allowlist
+
+if RESTRICTED_ADMIN_IP_ALLOWLIST and not parse_ip_allowlist(RESTRICTED_ADMIN_IP_ALLOWLIST):
+    import warnings
+
+    warnings.warn(
+        "ADMIN_IP_ALLOWLIST is set but no entries could be parsed; "
+        "/admin/ and /issuer/manage/ will be blocked for all clients.",
+        stacklevel=1,
+    )
+
+if not DEBUG and RESTRICTED_ADMIN_IP_ALLOWLIST and not TRUST_X_FORWARDED_FOR:
+    import warnings
+
+    warnings.warn(
+        "TRUST_X_FORWARDED_FOR is False while DEBUG is False. If Gunicorn runs behind "
+        "nginx, the allowlist middleware usually sees 127.0.0.1 (the proxy), not your "
+        "workstation IP. Set TRUST_X_FORWARDED_FOR=True and configure nginx to pass "
+        "X-Forwarded-For or X-Real-IP.",
+        stacklevel=1,
+    )
 
 # --- DigiLocker Issuer Configuration ---
 DIGILOCKER_ISSUER_ID = env("ISSUER_ID")
@@ -136,6 +165,9 @@ DIGILOCKER_REQUEST_TIMEOUT_MS = env("REQUEST_TIMEOUT_MS")
 DIGILOCKER_TIMESTAMP_SKEW_SECONDS = env("TIMESTAMP_SKEW_SECONDS")
 
 ISSUER_VERBOSE_LOGGING = env("ISSUER_VERBOSE_LOGGING")
+ISSUER_API_LOG_PATH = env("ISSUER_API_LOG_PATH")
+ISSUER_API_LOG_MAX_BYTES = env("ISSUER_API_LOG_MAX_BYTES")
+ISSUER_API_LOG_BACKUP_COUNT = env("ISSUER_API_LOG_BACKUP_COUNT")
 
 # --- Management console login protection ---
 MANAGE_LOGIN_MAX_FAILURES = env("MANAGE_LOGIN_MAX_FAILURES")
@@ -143,6 +175,8 @@ MANAGE_LOGIN_LOCKOUT_MINUTES = env("MANAGE_LOGIN_LOCKOUT_MINUTES")
 CAPTCHA_CHALLENGE_FUNCT = "captcha.helpers.math_challenge"
 CAPTCHA_FONT_SIZE = 28
 CAPTCHA_LENGTH = 4
+# django-simple-captcha caches this at import time; must be set here for manage.py test.
+CAPTCHA_TEST_MODE = "test" in sys.argv
 
 # --- Manage portal: Base64 PDF decoder (off by default in production) ---
 MANAGE_DECODE_PDF_ENABLED = env("MANAGE_DECODE_PDF_ENABLED")
@@ -165,30 +199,14 @@ if not DEBUG:
         SECURE_HSTS_INCLUDE_SUBDOMAINS = True
         SECURE_HSTS_PRELOAD = True
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "verbose": {
-            "format": "{asctime} {levelname} {name} {message}",
-            "style": "{",
-        },
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        },
-    },
-    "loggers": {
-        "issuer": {
-            "handlers": ["console"],
-            "level": "DEBUG" if (DEBUG or ISSUER_VERBOSE_LOGGING) else "INFO",
-            "propagate": False,
-        },
-        "django": {
-            "handlers": ["console"],
-            "level": "WARNING",
-        },
-    },
-}
+from config.logging_config import build_logging_config
+
+LOGGING = build_logging_config(
+    debug=DEBUG,
+    verbose=ISSUER_VERBOSE_LOGGING,
+    log_path=ISSUER_API_LOG_PATH,
+    max_bytes=ISSUER_API_LOG_MAX_BYTES,
+    backup_count=ISSUER_API_LOG_BACKUP_COUNT,
+    base_dir=BASE_DIR,
+    running_tests="test" in sys.argv,
+)

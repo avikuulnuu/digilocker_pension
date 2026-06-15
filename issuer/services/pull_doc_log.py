@@ -2,14 +2,14 @@
 
 import logging
 
+from issuer.log_safety import sanitize_log_context
+
 logger = logging.getLogger("issuer")
 
 
 def _context(**kwargs):
     parts = []
-    for key, value in kwargs.items():
-        if value is None or value == "":
-            continue
+    for key, value in sanitize_log_context(**kwargs).items():
         parts.append(f"{key}={value}")
     return " ".join(parts)
 

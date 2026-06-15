@@ -3,7 +3,7 @@
 from django.test import RequestFactory, TestCase, override_settings
 
 from config.middleware.ip_allowlist import RestrictedAdminIPMiddleware
-from config.ip_allowlist import get_client_ip, ip_is_allowed, parse_ip_allowlist
+from config.ip_allowlist import get_client_ip, ip_is_allowed, normalize_client_ip, parse_ip_allowlist
 
 
 class IpAllowlistHelpersTest(TestCase):
@@ -23,6 +23,18 @@ class IpAllowlistHelpersTest(TestCase):
             get_client_ip(request, trust_x_forwarded_for=False),
             "203.0.113.1",
         )
+
+    def test_get_client_ip_honors_x_real_ip_when_trusted(self):
+        request = RequestFactory().get("/", HTTP_X_REAL_IP="203.0.113.2")
+        self.assertEqual(
+            get_client_ip(request, trust_x_forwarded_for=True),
+            "203.0.113.2",
+        )
+
+    def test_ipv4_mapped_ipv6_matches_ipv4_allowlist(self):
+        allowed = parse_ip_allowlist(["127.0.0.1"])
+        self.assertTrue(ip_is_allowed("::ffff:127.0.0.1", allowed))
+        self.assertEqual(str(normalize_client_ip("::ffff:127.0.0.1")), "127.0.0.1")
 
 
 @override_settings(

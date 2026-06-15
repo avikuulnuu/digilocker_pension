@@ -4,7 +4,7 @@
 Usage:
     source venv/bin/activate
     python manage.py runserver 8000    # in another terminal
-    python test_e2e.py
+    python run_e2e.py
 """
 
 import base64

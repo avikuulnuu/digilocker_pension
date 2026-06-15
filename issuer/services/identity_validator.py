@@ -68,21 +68,16 @@ def validate_identity(doc: Document, full_name: str = "", dob: str = "") -> None
             similarity_pct = round(ratio * 100, 1)
             required_pct = round(required * 100, 1)
             logger.warning(
-                "pull_doc.identity: name provided but does not match "
-                "(mode=%s similarity=%s%% required=%s%% request=%r stored=%r doc_id=%s)",
+                "pull_doc.identity: name mismatch (mode=%s similarity=%s%% required=%s%% doc_id=%s)",
                 mode,
                 similarity_pct,
                 required_pct,
-                full_name,
-                doc.employee_name,
                 doc.pk,
             )
             stage_failed(
                 "identity",
-                "Name does not match document owner",
+                "IDENTITY_MISMATCH",
                 document_id=doc.pk,
-                request_name=full_name,
-                stored_name=doc.employee_name,
                 mode=mode,
                 similarity_pct=similarity_pct,
                 required_pct=required_pct,
