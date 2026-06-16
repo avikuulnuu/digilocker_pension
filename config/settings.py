@@ -24,9 +24,6 @@ env = environ.Env(
     MANAGE_LOGIN_LOCKOUT_MINUTES=(int, 15),
     SECURE_SSL_REDIRECT=(bool, True),
     SESSION_COOKIE_SECURE=(bool, True),
-    MANAGE_DECODE_PDF_ENABLED=(bool, False),
-    MANAGE_DECODE_PDF_TTL_SECONDS=(int, 900),
-    MANAGE_DECODE_PDF_MAX_SESSION_ITEMS=(int, 3),
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
@@ -68,7 +65,6 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "issuer.context_processors.manage_portal",
             ],
         },
     },
@@ -190,11 +186,6 @@ CAPTCHA_FONT_SIZE = 28
 CAPTCHA_LENGTH = 4
 # django-simple-captcha caches this at import time; must be set here for manage.py test.
 CAPTCHA_TEST_MODE = "test" in sys.argv
-
-# --- Manage portal: Base64 PDF decoder (off by default in production) ---
-MANAGE_DECODE_PDF_ENABLED = env("MANAGE_DECODE_PDF_ENABLED")
-MANAGE_DECODE_PDF_TTL_SECONDS = env("MANAGE_DECODE_PDF_TTL_SECONDS")
-MANAGE_DECODE_PDF_MAX_SESSION_ITEMS = env("MANAGE_DECODE_PDF_MAX_SESSION_ITEMS")
 
 # --- Security Hardening ---
 SECURE_CONTENT_TYPE_NOSNIFF = True

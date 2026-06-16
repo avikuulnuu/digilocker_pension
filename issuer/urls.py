@@ -21,10 +21,4 @@ urlpatterns = [
     path("manage/integrity-logs/", manage_views.integritylog_list, name="integritylog-list"),
     path("manage/kpi-report/download/", manage_views.kpi_report_download, name="kpi-report-download"),
     path("manage/kpi-report/", manage_views.kpi_report, name="kpi-report"),
-    path("manage/tools/decode-pdf/", manage_views.decode_pdf_tool, name="decode-pdf-tool"),
-    path(
-        "manage/tools/decode-pdf/view/<str:token>/",
-        manage_views.decode_pdf_view,
-        name="decode-pdf-view",
-    ),
 ]

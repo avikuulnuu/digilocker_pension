@@ -1,11 +1,8 @@
 """Read-only management UI for Document, AccessLog, and IntegrityLog."""
 
-import base64
 import csv
 import mimetypes
 import os
-import secrets
-from datetime import datetime
 from io import StringIO
 
 from django.conf import settings
@@ -39,7 +36,6 @@ from issuer.manage_filters import (
     integritylog_filter_choices,
 )
 from issuer.models import AccessLog, Document, IntegrityLog
-from issuer.services.base64_pdf import decode_pdf_bytes
 from issuer.services.file_service import (
     diagnose_document_file,
     effective_file_name,
@@ -330,133 +326,6 @@ def kpi_report_download(request):
     return response
 
 
-# --- Base64 PDF decoder (manage tools; gated by MANAGE_DECODE_PDF_ENABLED) ---
-
-import logging
-
-from django_ratelimit.decorators import ratelimit
-
-from issuer.manage_decode_pdf import require_decode_pdf_enabled, validate_decode_pdf_token
-
-logger = logging.getLogger("issuer")
-
-_DECODE_PDF_SESSION_PREFIX = "manage_decode_pdf:"
-
-
-def _decode_pdf_ttl_seconds() -> int:
-    return int(getattr(settings, "MANAGE_DECODE_PDF_TTL_SECONDS", 900))
-
-
-def _decode_pdf_max_session_items() -> int:
-    return int(getattr(settings, "MANAGE_DECODE_PDF_MAX_SESSION_ITEMS", 3))
-
-
-def _decode_pdf_max_bytes() -> int:
-    return int(getattr(settings, "DIGILOCKER_MAX_FILE_SIZE_MB", 10)) * 1024 * 1024
-
-
-def _decode_pdf_session_key(token: str) -> str:
-    return f"{_DECODE_PDF_SESSION_PREFIX}{token}"
-
-
-def _prune_decode_pdf_sessions(request) -> None:
-    """Drop expired decode-pdf entries from the session."""
-    now = timezone.now()
-    keys_to_delete = []
-    for key, value in request.session.items():
-        if not key.startswith(_DECODE_PDF_SESSION_PREFIX) or not isinstance(value, dict):
-            continue
-        created_raw = value.get("created")
-        if not created_raw:
-            keys_to_delete.append(key)
-            continue
-        try:
-            created = datetime.fromisoformat(created_raw)
-            if timezone.is_naive(created):
-                created = timezone.make_aware(created)
-        except (TypeError, ValueError):
-            keys_to_delete.append(key)
-            continue
-        if (now - created).total_seconds() > _decode_pdf_ttl_seconds():
-            keys_to_delete.append(key)
-    for key in keys_to_delete:
-        request.session.pop(key, None)
-
-
-def _count_decode_pdf_session_items(request) -> int:
-    return sum(
-        1
-        for key in request.session.keys()
-        if isinstance(key, str) and key.startswith(_DECODE_PDF_SESSION_PREFIX)
-    )
-
-
-@require_decode_pdf_enabled
-@ratelimit(key="user", rate="30/h", method="POST", block=True)
-@require_http_methods(["GET", "POST"])
-def decode_pdf_tool(request):
-    """Paste Base64 DocContent, decode, and open the PDF in the browser."""
-    _prune_decode_pdf_sessions(request)
-    context = {
-        "base64_input": "",
-        "error": "",
-        "view_url": "",
-        "decoded_size": None,
-    }
-
-    if request.method == "POST":
-        raw = request.POST.get("base64_input", "")
-        context["base64_input"] = raw
-        try:
-            pdf_bytes = decode_pdf_bytes(raw, max_bytes=_decode_pdf_max_bytes())
-        except ValueError as exc:
-            context["error"] = str(exc)
-        else:
-            if _count_decode_pdf_session_items(request) >= _decode_pdf_max_session_items():
-                context["error"] = (
-                    "Too many decoded documents in this session. "
-                    "Open or discard existing previews, or sign out and back in."
-                )
-            else:
-                token = secrets.token_urlsafe(16)
-                request.session[_decode_pdf_session_key(token)] = {
-                    "content_b64": base64.b64encode(pdf_bytes).decode("ascii"),
-                    "created": timezone.now().isoformat(),
-                }
-                request.session.modified = True
-                context["view_url"] = reverse("issuer:decode-pdf-view", kwargs={"token": token})
-                context["decoded_size"] = len(pdf_bytes)
-                context["base64_input"] = ""
-                logger.info(
-                    "manage_decode_pdf: decoded user=%s bytes=%d",
-                    request.user.get_username(),
-                    len(pdf_bytes),
-                )
-
-    return render(request, "issuer/manage/decode_pdf.html", context)
-
-
-@require_decode_pdf_enabled
-@ratelimit(key="user", rate="120/h", method="GET", block=True)
-@require_http_methods(["GET"])
-def decode_pdf_view(request, token):
-    """Serve a decoded PDF stored temporarily in the session."""
-    validate_decode_pdf_token(token)
-    _prune_decode_pdf_sessions(request)
-    entry = request.session.get(_decode_pdf_session_key(token))
-    if not entry or "content_b64" not in entry:
-        raise Http404("Decoded PDF not found or expired. Decode again from the tool page.")
-
-    try:
-        pdf_bytes = base64.b64decode(entry["content_b64"])
-    except (ValueError, TypeError) as exc:
-        raise Http404("Decoded PDF is corrupted.") from exc
-
-    response = HttpResponse(pdf_bytes, content_type="application/pdf")
-    response["Content-Disposition"] = 'inline; filename="decoded.pdf"'
-    return response
-
-
 # Require login + issuer.access_manage_portal on all management console views.
 from issuer.manage_auth import require_manage_portal  # noqa: E402
 
@@ -474,8 +343,6 @@ _MANAGE_PORTAL_VIEWS = (
     "integritylog_export",
     "kpi_report",
     "kpi_report_download",
-    "decode_pdf_tool",
-    "decode_pdf_view",
 )
 
 for _manage_view_name in _MANAGE_PORTAL_VIEWS:
