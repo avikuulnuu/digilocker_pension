@@ -7,6 +7,7 @@ import logging
 import time
 
 from django.conf import settings
+from django.db.models import F
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -363,7 +364,7 @@ def document_fetch_view(request, uri):
 
 
 def _log_access(data: dict, doc, status: int, elapsed_ms: int, error: str = ""):
-    """Write an access log entry."""
+    """Write an access log entry and update document access stats on success."""
     try:
         doc_type_val = data.get("document_type", "") or ""
         if len(doc_type_val) > 30:
@@ -387,5 +388,10 @@ def _log_access(data: dict, doc, status: int, elapsed_ms: int, error: str = ""):
             error_message=error,
             processing_time_ms=elapsed_ms,
         )
+        if doc is not None and status == 1:
+            Document.objects.filter(pk=doc.pk).update(
+                access_count=F("access_count") + 1,
+                last_accessed_at=timezone.now(),
+            )
     except Exception:
         logger.exception("Failed to write access log")

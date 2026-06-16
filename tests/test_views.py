@@ -107,6 +107,10 @@ class PullURIViewTest(TestCase):
 
         self.assertTrue(AccessLog.objects.filter(txn_id="test-txn").exists())
 
+        self.doc.refresh_from_db()
+        self.assertEqual(self.doc.access_count, 1)
+        self.assertIsNotNone(self.doc.last_accessed_at)
+
     def test_pull_uri_success_without_dob(self):
         ts = timezone.now().isoformat()
         keyhash = hashlib.sha256(
@@ -138,6 +142,41 @@ class PullURIViewTest(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Status="1"', response.content)
+
+    def test_pull_uri_failure_does_not_update_access_stats(self):
+        ts = timezone.now().isoformat()
+        keyhash = hashlib.sha256(
+            (settings.DIGILOCKER_API_KEY + ts).encode()
+        ).hexdigest()
+
+        body = (
+            f'<?xml version="1.0" encoding="UTF-8"?>'
+            f'<PullURIRequest xmlns="http://tempuri.org/" ver="3.0"'
+            f' ts="{ts}" txn="test-txn-missing-auth"'
+            f' orgId="{settings.DIGILOCKER_ISSUER_ID}"'
+            f' keyhash="{keyhash}" format="both">'
+            f"<DocDetails>"
+            f"<DocType>PECER</DocType>"
+            f"<DigiLockerId>dl-test</DigiLockerId>"
+            f"<FullName>Sunil Kumar</FullName>"
+            f"<AUTHN>DOESNOTEXIST</AUTHN>"
+            f"</DocDetails>"
+            f"</PullURIRequest>"
+        ).encode()
+
+        hmac_sig = self._make_signed_request(body)
+
+        response = self.client.post(
+            "/api/pulluri",
+            data=body,
+            content_type="application/xml",
+            HTTP_X_DIGILOCKER_HMAC=hmac_sig,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Status="0"', response.content)
+        self.doc.refresh_from_db()
+        self.assertEqual(self.doc.access_count, 0)
+        self.assertIsNone(self.doc.last_accessed_at)
 
     def test_pull_uri_ignores_mismatched_dob(self):
         ts = timezone.now().isoformat()
