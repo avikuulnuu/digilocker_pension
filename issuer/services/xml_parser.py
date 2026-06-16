@@ -10,6 +10,9 @@ logger = logging.getLogger("issuer")
 
 NS = {"dl": "http://tempuri.org/"}
 
+# DigiLocker portal maps the authorization search field to AUTHN (not UDF1).
+AUTHN_TAG = "AUTHN"
+
 
 class XMLParseError(Exception):
     """Raised when XML request cannot be parsed or is missing required fields."""
@@ -82,7 +85,11 @@ def parse_pull_uri_request(raw_xml: bytes) -> PullURIRequestData:
     if not data.doc_type:
         raise XMLParseError("Missing mandatory element: DocType")
 
-    # Collect UDFs (UDF1, UDF2, ... UDFn)
+    authn = _text(doc_details, AUTHN_TAG)
+    if authn:
+        data.udfs[AUTHN_TAG] = authn
+
+    # Collect any additional UDFs (UDF1, UDF2, ... UDFn)
     for child in doc_details:
         tag = etree.QName(child).localname
         if tag.upper().startswith("UDF"):

@@ -13,7 +13,7 @@ class IdentityValidatorStrictTest(TestCase):
     def setUp(self):
         self.doc = Document.objects.create(
             authorization_number="AUTH002",
-            document_type="PPO",
+            document_type="PECER",
             external_system_id=2002,
             authorization_date=date(2024, 1, 1),
             employee_name="Sunil Kumar",
@@ -45,7 +45,7 @@ class IdentityValidatorLenientTest(TestCase):
     def setUp(self):
         self.doc = Document.objects.create(
             authorization_number="AUTH003",
-            document_type="PPO",
+            document_type="PECER",
             external_system_id=2003,
             authorization_date=date(2024, 1, 1),
             employee_name="Test User",

@@ -46,11 +46,11 @@ def test_pull_uri():
         f' orgId="in.nic.ngl.digilocker"'
         f' keyhash="{keyhash}" format="both">'
         f"<DocDetails>"
-        f"<DocType>PPO</DocType>"
+        f"<DocType>PECER</DocType>"
         f"<DigiLockerId>test-locker-id</DigiLockerId>"
         f"<FullName>Test User</FullName>"
         f"<DOB>01-01-1990</DOB>"
-        f"<UDF1>AUTH001</UDF1>"
+        f"<AUTHN>AUTH001</AUTHN>"
         f"</DocDetails>"
         f"</PullURIRequest>"
     ).encode()
@@ -88,9 +88,9 @@ def test_pull_uri_no_hmac():
         b'<PullURIRequest xmlns="http://tempuri.org/" ver="3.0"'
         b' ts="2024-01-01T00:00:00+05:30" txn="no-hmac"'
         b' orgId="in.nic.ngl.digilocker" keyhash="bad">'
-        b"<DocDetails><DocType>PPO</DocType>"
+        b"<DocDetails><DocType>PECER</DocType>"
         b"<DigiLockerId>x</DigiLockerId>"
-        b"<UDF1>PPO123456</UDF1>"
+        b"<AUTHN>PECER123456</AUTHN>"
         b"</DocDetails></PullURIRequest>"
     )
 
@@ -126,11 +126,11 @@ def test_pull_uri_wrong_doc():
         f' orgId="in.nic.ngl.digilocker"'
         f' keyhash="{keyhash}" format="both">'
         f"<DocDetails>"
-        f"<DocType>PPO</DocType>"
+        f"<DocType>PECER</DocType>"
         f"<DigiLockerId>test-locker</DigiLockerId>"
         f"<FullName>Nobody</FullName>"
         f"<DOB>01-01-2000</DOB>"
-        f"<UDF1>DOESNOTEXIST</UDF1>"
+        f"<AUTHN>DOESNOTEXIST</AUTHN>"
         f"</DocDetails>"
         f"</PullURIRequest>"
     ).encode()
@@ -174,11 +174,11 @@ def test_pull_uri_wrong_identity():
         f' orgId="in.nic.ngl.digilocker"'
         f' keyhash="{keyhash}" format="both">'
         f"<DocDetails>"
-        f"<DocType>PPO</DocType>"
+        f"<DocType>PECER</DocType>"
         f"<DigiLockerId>test-locker</DigiLockerId>"
         f"<FullName>Wrong Name</FullName>"
         f"<DOB>31-12-1990</DOB>"
-        f"<UDF1>AUTH001</UDF1>"
+        f"<AUTHN>AUTH001</AUTHN>"
         f"</DocDetails>"
         f"</PullURIRequest>"
     ).encode()

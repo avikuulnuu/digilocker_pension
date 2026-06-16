@@ -24,7 +24,7 @@ class PullURIViewTest(TestCase):
 
         # Fetch the document with a mobile param
         self.doc.digilocker_doc_id = "TESTDOC01"
-        self.doc.digilocker_uri = "issuer-PPO-TESTDOC01"
+        self.doc.digilocker_uri = "issuer-PECER-TESTDOC01"
         self.doc.save(update_fields=["digilocker_doc_id", "digilocker_uri"])
         url = f"/api/document/{self.doc.digilocker_uri}?mobile=8888888888"
         hmac_sig = "dummyhmac"  # bypassed in test
@@ -45,7 +45,7 @@ class PullURIViewTest(TestCase):
 
         self.doc = Document.objects.create(
             authorization_number="AUTH100",
-            document_type="PPO",
+            document_type="PECER",
             external_system_id=2100,
             authorization_date=date(2024, 1, 1),
             employee_name="Sunil Kumar",
@@ -84,11 +84,11 @@ class PullURIViewTest(TestCase):
             f' orgId="{settings.DIGILOCKER_ISSUER_ID}"'
             f' keyhash="{keyhash}" format="both">'
             f"<DocDetails>"
-            f"<DocType>PPO</DocType>"
+            f"<DocType>PECER</DocType>"
             f"<DigiLockerId>dl-test</DigiLockerId>"
             f"<FullName>Sunil Kumar</FullName>"
             f"<DOB>31-12-1990</DOB>"
-            f"<UDF1>AUTH100</UDF1>"
+            f"<AUTHN>AUTH100</AUTHN>"
             f"</DocDetails>"
             f"</PullURIRequest>"
         ).encode()
@@ -120,10 +120,10 @@ class PullURIViewTest(TestCase):
             f' orgId="{settings.DIGILOCKER_ISSUER_ID}"'
             f' keyhash="{keyhash}" format="both">'
             f"<DocDetails>"
-            f"<DocType>PPO</DocType>"
+            f"<DocType>PECER</DocType>"
             f"<DigiLockerId>dl-test</DigiLockerId>"
             f"<FullName>Sunil Kumar</FullName>"
-            f"<UDF1>AUTH100</UDF1>"
+            f"<AUTHN>AUTH100</AUTHN>"
             f"</DocDetails>"
             f"</PullURIRequest>"
         ).encode()
@@ -152,11 +152,11 @@ class PullURIViewTest(TestCase):
             f' orgId="{settings.DIGILOCKER_ISSUER_ID}"'
             f' keyhash="{keyhash}" format="both">'
             f"<DocDetails>"
-            f"<DocType>PPO</DocType>"
+            f"<DocType>PECER</DocType>"
             f"<DigiLockerId>dl-test</DigiLockerId>"
             f"<FullName>Sunil Kumar</FullName>"
             f"<DOB>01-01-2000</DOB>"
-            f"<UDF1>AUTH100</UDF1>"
+            f"<AUTHN>AUTH100</AUTHN>"
             f"</DocDetails>"
             f"</PullURIRequest>"
         ).encode()
@@ -176,9 +176,9 @@ class PullURIViewTest(TestCase):
         body = (
             b'<PullURIRequest xmlns="http://tempuri.org/" ver="3.0"'
             b' ts="now" txn="1" orgId="x" keyhash="y">'
-            b"<DocDetails><DocType>PPO</DocType>"
+            b"<DocDetails><DocType>PECER</DocType>"
             b"<DigiLockerId>x</DigiLockerId>"
-            b"<UDF1>PPO123456</UDF1>"
+            b"<AUTHN>PECER123456</AUTHN>"
             b"</DocDetails></PullURIRequest>"
         )
         response = self.client.post(

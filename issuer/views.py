@@ -100,8 +100,8 @@ def pull_uri_view(request):
         timestamp = request_data.timestamp
         log_data["txn_id"] = txn
         log_data["document_type"] = request_data.doc_type
-        if request_data.udfs.get("UDF1"):
-            log_data["authorization_number"] = request_data.udfs["UDF1"]
+        if request_data.udfs.get("AUTHN"):
+            log_data["authorization_number"] = request_data.udfs["AUTHN"]
         log_data["digilocker_id"] = request_data.digilocker_id
         xml_parsed(
             txn=txn,

@@ -3,6 +3,9 @@
 import base64
 import logging
 
+from django.conf import settings
+from lxml import etree
+
 from issuer.models import Document
 from issuer.services.file_service import (
     FileNotAvailableError,
@@ -14,10 +17,17 @@ from issuer.services.file_service import (
 from issuer.services.identity_validator import validate_identity, IdentityMismatchError
 from issuer.services.pull_doc_log import stage_failed, stage_ok
 from issuer.services.uri_service import ensure_uri
-from issuer.services.xml_parser import PullURIRequestData
+from issuer.services.xml_parser import AUTHN_TAG, PullURIRequestData
 from issuer.log_safety import mask_identifier, mask_path
 
 logger = logging.getLogger("issuer")
+
+DOC_TYPE_DISPLAY_NAMES = {
+    "PECER": "Pensioner's Certificate",
+    "PCPYO": "Commutation Payment Order",
+    "GRPYO": "Gratuity Payment Order",
+    "GPFFP": "GPF Final Payment",
+}
 
 
 class DocumentNotFoundError(Exception):
@@ -41,10 +51,10 @@ def _fail_file_unavailable(reason_code, message, *, txn="", **context):
 def lookup_document(request_data: PullURIRequestData, *, txn: str = "") -> Document:
     """Find the document matching the request criteria.
 
-    Looks up by authorization_number (from UDF1) + document_type, with detailed
+    Looks up by authorization_number (from AUTHN) + document_type, with detailed
     diagnostics when the record or stored file cannot be resolved.
     """
-    authorization_number = request_data.udfs.get("UDF1", "").strip()
+    authorization_number = request_data.udfs.get(AUTHN_TAG, "").strip()
     doc_type = (request_data.doc_type or "").strip()
     logger.info(
         "pull_doc.lookup: starting lookup doc_type=%r txn=%s document_id_hint=%s",
@@ -54,8 +64,8 @@ def lookup_document(request_data: PullURIRequestData, *, txn: str = "") -> Docum
     )
     if not authorization_number:
         _fail_lookup(
-            "MISSING_UDF1",
-            "No search identifier (UDF1) provided in the request",
+            "MISSING_AUTHN",
+            "No search identifier (AUTHN) provided in the request",
             txn=txn,
             doc_type=doc_type,
         )
@@ -209,22 +219,109 @@ def process_pull_uri(
     }
 
 
+def _format_date(value) -> str:
+    return value.strftime("%d/%m/%Y") if value else ""
+
+
 def _build_metadata_xml(doc: Document) -> str:
-    """Build a simple certificate metadata XML for DataContent."""
-    dob_str = doc.employee_dob.strftime("%d-%m-%Y") if doc.employee_dob else ""
-    return (
-        f'<?xml version="1.0" encoding="UTF-8"?>'
-        f"<CertificateData>"
-        f"<Name>{doc.employee_name or ''}</Name>"
-        f"<Gender>{doc.employee_gender or ''}</Gender>"
-        f"<Mobile>{doc.employee_mobile or ''}</Mobile>"
-        f"<DOB>{dob_str}</DOB>"
-        f"<AuthorizationNumber>{doc.authorization_number}</AuthorizationNumber>"
-        f"<AuthorizationDate>{doc.authorization_date or ''}</AuthorizationDate>"
-        f"<DocumentType>{doc.document_type}</DocumentType>"
-        f"<DDOName>{doc.ddo_name or ''}</DDOName>"
-        f"<TreasuryName>{doc.treasury_name or ''}</TreasuryName>"
-        f"<ApplicationNumber>{doc.application_number or ''}</ApplicationNumber>"
-        f"<ExternalSystemId>{doc.external_system_id or ''}</ExternalSystemId>"
-        f"</CertificateData>"
+    """Build DLTS certificate metadata XML for DataContent."""
+    cert_name = DOC_TYPE_DISPLAY_NAMES.get(
+        doc.document_type, doc.document_type or "Certificate"
     )
+    auth_date = _format_date(doc.authorization_date)
+    dob = _format_date(doc.employee_dob)
+    status = "A" if doc.is_active else "I"
+
+    root = etree.Element(
+        "Certificate",
+        language=settings.DIGILOCKER_CERT_LANGUAGE,
+        name=cert_name,
+        type=doc.document_type or "",
+        number=doc.authorization_number or "",
+        prevnumber="",
+        expirydate="",
+        validfromdate="",
+        issuedat="",
+        issuedate=auth_date,
+        status=status,
+    )
+
+    issued_by = etree.SubElement(root, "IssuedBy")
+    org = etree.SubElement(
+        issued_by,
+        "Organization",
+        name=settings.DIGILOCKER_CERT_ISSUER_NAME,
+        code=settings.DIGILOCKER_ISSUER_ID,
+        tin="",
+        uid="",
+        type=settings.DIGILOCKER_CERT_ISSUER_ORG_TYPE,
+    )
+    etree.SubElement(
+        org,
+        "Address",
+        type=settings.DIGILOCKER_CERT_ISSUER_ADDRESS_TYPE,
+        line1=settings.DIGILOCKER_CERT_ISSUER_ADDRESS_LINE1,
+        line2="",
+        house="",
+        landmark="",
+        locality="",
+        vtc="",
+        district="",
+        pin=settings.DIGILOCKER_CERT_ISSUER_ADDRESS_PIN,
+        state=settings.DIGILOCKER_CERT_ISSUER_ADDRESS_STATE,
+        country=settings.DIGILOCKER_CERT_ISSUER_ADDRESS_COUNTRY,
+    )
+
+    issued_to = etree.SubElement(root, "IssuedTo")
+    person = etree.SubElement(
+        issued_to,
+        "Person",
+        uid="",
+        title="",
+        name=doc.employee_name or "",
+        dob=dob,
+        age="",
+        RelationName="",
+        gender=doc.employee_gender or "",
+        category="",
+        religion="",
+        phone=doc.employee_mobile or "",
+        email="",
+    )
+    etree.SubElement(
+        person,
+        "Address",
+        type="",
+        line1="",
+        line2="",
+        PLOTNo="",
+        tax="",
+        locality="",
+        vtc="",
+        district="",
+        pin="",
+        state="",
+        country="IN",
+    )
+
+    cert_data = etree.SubElement(root, "CertificateData")
+    etree.SubElement(
+        cert_data,
+        "Certificate",
+        name="",
+        number="",
+        place=doc.treasury_name or settings.DIGILOCKER_CERT_ISSUER_ADDRESS_LINE1,
+        date=auth_date,
+    )
+    ge_number = etree.SubElement(cert_data, "GENumber")
+    ge_number.text = str(doc.external_system_id or "")
+    designation = etree.SubElement(cert_data, "Designation")
+    designation.text = doc.ddo_name or ""
+    treasury = etree.SubElement(cert_data, "TreasuryDivision")
+    treasury.text = doc.treasury_name or ""
+
+    etree.SubElement(root, "Signature")
+
+    return etree.tostring(
+        root, xml_declaration=True, encoding="UTF-8", pretty_print=False
+    ).decode("utf-8")

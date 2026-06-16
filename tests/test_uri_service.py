@@ -13,7 +13,7 @@ class URIServiceTest(TestCase):
     def setUp(self):
         self.doc = Document.objects.create(
             authorization_number="AUTH001",
-            document_type="PPO",
+            document_type="PECER",
             external_system_id=2001,
             authorization_date=date(2024, 1, 1),
             employee_name="Test User",
@@ -22,8 +22,8 @@ class URIServiceTest(TestCase):
         )
 
     def test_build_uri_format(self):
-        uri = build_uri("PPO", "XY12345Z")
-        self.assertEqual(uri, f"{settings.DIGILOCKER_ISSUER_ID}-PPO-XY12345Z")
+        uri = build_uri("PECER", "XY12345Z")
+        self.assertEqual(uri, f"{settings.DIGILOCKER_ISSUER_ID}-PECER-XY12345Z")
 
     def test_ensure_uri_generates_once(self):
         uri1 = ensure_uri(self.doc.pk)

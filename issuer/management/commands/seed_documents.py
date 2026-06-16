@@ -4,10 +4,10 @@ from django.utils import timezone
 from issuer.models import Document
 
 DOCS = [
-    {"authorization_number": "AUTH1001", "document_type": "GPF", "file_name": "IMLIAKUM_GPF.pdf", "employee_name": "Imliakum", "external_system_id": 1001},
-    {"authorization_number": "AUTH1002", "document_type": "CPO", "file_name": "KIKWETNA_CPO.pdf", "employee_name": "Kitwena", "external_system_id": 1002},
-    {"authorization_number": "AUTH1003", "document_type": "PPO", "file_name": "KIKWETNA_PPO.pdf", "employee_name": "Kitwena", "external_system_id": 1003},
-    {"authorization_number": "AUTH1004", "document_type": "GPO", "file_name": "KIKWETNA_GPO.pdf", "employee_name": "Kitwena", "external_system_id": 1004},
+    {"authorization_number": "AUTH1001", "document_type": "GPFFP", "file_name": "IMLIAKUM_GPF.pdf", "employee_name": "Imliakum", "external_system_id": 1001},
+    {"authorization_number": "AUTH1002", "document_type": "PCPYO", "file_name": "KIKWETNA_CPO.pdf", "employee_name": "Kitwena", "external_system_id": 1002},
+    {"authorization_number": "AUTH1003", "document_type": "PECER", "file_name": "KIKWETNA_PPO.pdf", "employee_name": "Kitwena", "external_system_id": 1003},
+    {"authorization_number": "AUTH1004", "document_type": "GRPYO", "file_name": "KIKWETNA_GPO.pdf", "employee_name": "Kitwena", "external_system_id": 1004},
 ]
 
 class Command(BaseCommand):

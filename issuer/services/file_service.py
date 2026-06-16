@@ -26,7 +26,7 @@ class IntegrityCheckError(Exception):
 
 def storage_base_for_document_type(document_type: str) -> str:
     """Return the configured storage root for the given document type."""
-    if (document_type or "").upper() == "GPF":
+    if (document_type or "").upper() == "GPFFP":
         base = settings.DIGILOCKER_GPF_STORAGE_PATH
     else:
         base = settings.DIGILOCKER_BASE_STORAGE_PATH
@@ -34,7 +34,7 @@ def storage_base_for_document_type(document_type: str) -> str:
 
 
 def _storage_env_var_for_document_type(document_type: str) -> str:
-    if (document_type or "").upper() == "GPF":
+    if (document_type or "").upper() == "GPFFP":
         return "GPF_STORAGE_PATH"
     return "BASE_STORAGE_PATH"
 
@@ -67,7 +67,7 @@ def effective_file_name(file_name: str, *, document_type: str = "") -> str:
     stem = _db_file_stem(file_name)
     if not stem:
         return ""
-    if (document_type or "").upper() == "GPF":
+    if (document_type or "").upper() == "GPFFP":
         return f"{stem}.pdf"
     return f"{stem}_signed.pdf"
 

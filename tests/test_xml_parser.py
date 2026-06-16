@@ -12,11 +12,11 @@ class XMLParserTest(TestCase):
         b' ts="2024-05-21T12:34:56+05:30" txn="txn123"'
         b' orgId="in.gov.state.department" keyhash="abc123" format="both">'
         b"<DocDetails>"
-        b"<DocType>PPO</DocType>"
+        b"<DocType>PECER</DocType>"
         b"<DigiLockerId>dl123</DigiLockerId>"
         b"<FullName>Sunil Kumar</FullName>"
         b"<DOB>31-12-1990</DOB>"
-        b"<UDF1>AUTH001</UDF1>"
+        b"<AUTHN>AUTH001</AUTHN>"
         b"</DocDetails>"
         b"</PullURIRequest>"
     )
@@ -25,10 +25,10 @@ class XMLParserTest(TestCase):
         data = parse_pull_uri_request(self.VALID_XML)
         self.assertEqual(data.ver, "3.0")
         self.assertEqual(data.txn, "txn123")
-        self.assertEqual(data.doc_type, "PPO")
+        self.assertEqual(data.doc_type, "PECER")
         self.assertEqual(data.full_name, "Sunil Kumar")
         self.assertEqual(data.dob, "31-12-1990")
-        self.assertEqual(data.udfs.get("UDF1"), "AUTH001")
+        self.assertEqual(data.udfs.get("AUTHN"), "AUTH001")
 
     def test_malformed_xml_raises(self):
         with self.assertRaises(XMLParseError):
