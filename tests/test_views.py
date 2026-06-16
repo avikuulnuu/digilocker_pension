@@ -1,4 +1,4 @@
-"""Integration tests for the Pull URI and Document Fetch views."""
+"""Integration tests for the Pull URI API."""
 
 import base64
 import hashlib
@@ -16,26 +16,6 @@ from issuer.models import AccessLog, Document
 
 
 class PullURIViewTest(TestCase):
-    def test_document_fetch_logs_extra_fields(self):
-        # Set up extra fields on the document
-        self.doc.employee_mobile = "9999999999"
-        self.doc.file_checksum = "abc123"
-        self.doc.save()
-
-        # Fetch the document with a mobile param
-        self.doc.digilocker_doc_id = "TESTDOC01"
-        self.doc.digilocker_uri = "issuer-PECER-TESTDOC01"
-        self.doc.save(update_fields=["digilocker_doc_id", "digilocker_uri"])
-        url = f"/api/document/{self.doc.digilocker_uri}?mobile=8888888888"
-        hmac_sig = "dummyhmac"  # bypassed in test
-        with patch("issuer.views.read_file_bytes", return_value=b"PDFDATA"):
-            with patch("issuer.views.Document.objects.get", return_value=self.doc):
-                response = self.client.get(url, HTTP_X_DIGILOCKER_HMAC=hmac_sig)
-        self.assertEqual(response.status_code, 200)
-        log = AccessLog.objects.latest("id")
-        self.assertEqual(log.requested_mobile, "8888888888")
-        self.assertEqual(log.file_path, self.doc.file_name)
-        self.assertEqual(log.file_checksum, "abc123")
     def setUp(self):
         self.base_path = tempfile.mkdtemp()
         self.file_stem = "test_auth100_ppo"
@@ -230,3 +210,20 @@ class PullURIViewTest(TestCase):
     def test_pull_uri_get_not_allowed(self):
         response = self.client.get("/api/pulluri")
         self.assertEqual(response.status_code, 405)
+
+    def test_legacy_pull_doc_endpoints_return_404(self):
+        for path in ("/api/pulldoc", "/api/pull-doc"):
+            for method in ("get", "post"):
+                response = getattr(self.client, method)(path)
+                self.assertEqual(response.status_code, 404, msg=f"{method.upper()} {path}")
+                self.assertIn(b"not available", response.content)
+
+    def test_document_fetch_by_uri_returns_404(self):
+        uri = "in.gov.state.department-PECER-TESTDOC01"
+        response = self.client.get(
+            f"/api/document/{uri}",
+            HTTP_X_DIGILOCKER_HMAC="dummy",
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertIn(b"not available", response.content)
+        self.assertFalse(AccessLog.objects.exists())

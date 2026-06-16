@@ -3,8 +3,21 @@ from django.contrib import admin
 from issuer.models import AccessLog, Document, IntegrityLog
 
 
+class ReadOnlyModelAdmin(admin.ModelAdmin):
+    """Django admin: list and view only — no add, edit, or delete."""
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(Document)
-class DocumentAdmin(admin.ModelAdmin):
+class DocumentAdmin(ReadOnlyModelAdmin):
     list_display = (
         "id", "authorization_number", "document_type", "digilocker_uri",
         "employee_name", "employee_gender", "employee_mobile", "employee_dob",
@@ -19,7 +32,7 @@ class DocumentAdmin(admin.ModelAdmin):
 
 
 @admin.register(AccessLog)
-class AccessLogAdmin(admin.ModelAdmin):
+class AccessLogAdmin(ReadOnlyModelAdmin):
     list_display = (
         "id", "txn_id", "document_type", "authorization_number",
         "requested_mobile", "file_path", "file_checksum",
@@ -31,7 +44,7 @@ class AccessLogAdmin(admin.ModelAdmin):
 
 
 @admin.register(IntegrityLog)
-class IntegrityLogAdmin(admin.ModelAdmin):
+class IntegrityLogAdmin(ReadOnlyModelAdmin):
     list_display = (
         "id", "issue_type", "action_taken", "document", "authorization_number", "document_type", "digilocker_txn", "digilocker_id", "request_ip", "stored_file_size", "calculated_file_size", "created_at"
     )

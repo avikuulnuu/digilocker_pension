@@ -1,14 +1,10 @@
 """DigiLocker Issuer API views."""
 
-import base64
-import hashlib
-import hmac
 import logging
 import time
 
-from django.conf import settings
 from django.db.models import F
-from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
+from django.http import HttpResponse, HttpResponseNotAllowed
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
@@ -22,7 +18,6 @@ from issuer.services.document_service import (
 from issuer.services.file_service import (
     FileNotAvailableError,
     IntegrityCheckError,
-    read_file_bytes,
 )
 from issuer.services.identity_validator import IdentityMismatchError
 from issuer.services.response_builder import (
@@ -51,6 +46,22 @@ def _get_client_ip(request):
     if xff:
         return xff.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR")
+
+
+@csrf_exempt
+def pull_doc_disabled_view(request):
+    """Reject legacy Pull Document Request API (removed in DLTS v1.13)."""
+    logger.warning(
+        "pull_doc.disabled: deprecated Pull Document API request | method=%s path=%s ip=%s",
+        request.method,
+        request.path,
+        _get_client_ip(request),
+    )
+    return HttpResponse(
+        "Pull Document Request API is not available. Use POST /api/pulluri instead.",
+        status=404,
+        content_type="text/plain",
+    )
 
 
 @csrf_exempt
@@ -251,116 +262,20 @@ def pull_uri_view(request):
 
 
 @csrf_exempt
-@ratelimit(key="ip", rate="60/m", method="GET", block=True)
-def document_fetch_view(request, uri):
-    """GET /api/document/<uri> — Fetch document PDF by URI."""
-    if request.method != "GET":
-        return HttpResponseNotAllowed(["GET"])
-
-    start_time = time.monotonic()
-    request_ip = _get_client_ip(request)
-    log_data = {
-        "request_ip": request_ip,
-        "user_agent": request.META.get("HTTP_USER_AGENT", ""),
-        "requested_mobile": request.GET.get("mobile"),
-    }
-    request_received(endpoint="document-fetch", request_ip=request_ip, user_agent=log_data["user_agent"])
-
-    try:
-        # Authenticate via HMAC on empty body or query string
-        hmac_header = request.META.get("HTTP_X_DIGILOCKER_HMAC", "")
-        if not hmac_header:
-            elapsed = int((time.monotonic() - start_time) * 1000)
-            auth_failed(reason="Missing X-DigiLocker-HMAC header", request_ip=request_ip)
-            retrieval_failed(
-                endpoint="document-fetch",
-                stage="auth",
-                reason="Missing HMAC header",
-                uri=uri,
-                elapsed_ms=elapsed,
-            )
-            _log_access(log_data, None, 0, elapsed, "Missing HMAC header")
-            return HttpResponse(status=401)
-
-        try:
-            doc = Document.objects.get(digilocker_uri=uri, is_active=True, digilocker_enabled=True)
-        except Document.DoesNotExist:
-            elapsed = int((time.monotonic() - start_time) * 1000)
-            retrieval_failed(
-                endpoint="document-fetch",
-                stage="lookup",
-                reason="URI_NOT_FOUND",
-                uri=uri,
-                elapsed_ms=elapsed,
-            )
-            _log_access(log_data, None, 0, elapsed, f"URI not found: {uri}")
-            return HttpResponse(status=404)
-
-        log_data["authorization_number"] = doc.authorization_number
-        log_data["document_type"] = doc.document_type
-        log_data["file_path"] = doc.file_name
-        log_data["file_checksum"] = doc.file_checksum
-        log_data["requested_mobile"] = request.GET.get("mobile") or doc.employee_mobile
-        stage_ok(
-            "lookup",
-            "Document resolved by URI",
-            document_id=doc.pk,
-            uri=uri,
-            authorization_number=doc.authorization_number,
-        )
-
-        file_bytes = read_file_bytes(doc, request_ip=request_ip)
-
-        elapsed = int((time.monotonic() - start_time) * 1000)
-        _log_access(log_data, doc, 1, elapsed)
-        retrieval_success(
-            endpoint="document-fetch",
-            document_id=doc.pk,
-            uri=uri,
-            file_bytes=len(file_bytes),
-            elapsed_ms=elapsed,
-        )
-
-        response = HttpResponse(file_bytes, content_type="application/pdf")
-        response["Content-Disposition"] = f'inline; filename="{doc.digilocker_doc_id}.pdf"'
-        return response
-
-    except FileNotAvailableError as exc:
-        elapsed = int((time.monotonic() - start_time) * 1000)
-        retrieval_failed(
-            endpoint="document-fetch",
-            stage="file_read",
-            reason=safe_failure_reason(exc),
-            uri=uri,
-            elapsed_ms=elapsed,
-        )
-        _log_access(log_data, None, 0, elapsed, str(exc))
-        return HttpResponse(status=410)
-
-    except IntegrityCheckError as exc:
-        elapsed = int((time.monotonic() - start_time) * 1000)
-        retrieval_failed(
-            endpoint="document-fetch",
-            stage="integrity",
-            reason=safe_failure_reason(exc),
-            uri=uri,
-            elapsed_ms=elapsed,
-        )
-        _log_access(log_data, None, 0, elapsed, str(exc))
-        return HttpResponse(status=410)
-
-    except Exception:
-        elapsed = int((time.monotonic() - start_time) * 1000)
-        logger.exception("Unexpected error in document_fetch_view")
-        retrieval_failed(
-            endpoint="document-fetch",
-            stage="internal",
-            reason="Internal error",
-            uri=uri,
-            elapsed_ms=elapsed,
-        )
-        _log_access(log_data, None, 0, elapsed, "Internal error")
-        return HttpResponse(status=500)
+def document_fetch_disabled_view(request, uri=""):
+    """Reject public document fetch by URI — PDF is served via Pull URI response only."""
+    logger.warning(
+        "document_fetch.disabled: rejected request | method=%s path=%s uri=%s ip=%s",
+        request.method,
+        request.path,
+        uri,
+        _get_client_ip(request),
+    )
+    return HttpResponse(
+        "Document fetch by URI is not available. Use POST /api/pulluri with format=both or format=pdf.",
+        status=404,
+        content_type="text/plain",
+    )
 
 
 def _log_access(data: dict, doc, status: int, elapsed_ms: int, error: str = ""):

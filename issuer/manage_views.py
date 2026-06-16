@@ -155,7 +155,6 @@ def document_detail(request, pk):
     )
 
 
-@require_http_methods(["GET"])
 def document_view_file(request, pk):
     """Serve the stored document file for in-browser preview (manage UI only)."""
     doc = get_object_or_404(Document, pk=pk)
@@ -309,7 +308,6 @@ def kpi_report(request):
     )
 
 
-@require_http_methods(["GET"])
 def kpi_report_download(request):
     date_from, date_to, error = parse_period(
         request.GET.get("date_from", ""),
@@ -347,4 +345,6 @@ _MANAGE_PORTAL_VIEWS = (
 
 for _manage_view_name in _MANAGE_PORTAL_VIEWS:
     _view = globals()[_manage_view_name]
-    globals()[_manage_view_name] = require_manage_portal(_view)
+    globals()[_manage_view_name] = require_manage_portal(
+        require_http_methods(["GET"])(_view)
+    )

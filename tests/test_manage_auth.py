@@ -94,3 +94,36 @@ class ManagePortalAuthTest(TestCase):
         self.assertRedirects(response, self.login_url, fetch_redirect_response=False)
         response = self.client.get(self.hub_url)
         self.assertEqual(response.status_code, 302)
+
+
+@override_settings(CAPTCHA_TEST_MODE=True)
+class ManagePortalReadOnlyTest(TestCase):
+    """Data views under /issuer/manage/ must not accept mutating HTTP methods."""
+
+    READ_ONLY_GET_URLS = (
+        "issuer:manage-hub",
+        "issuer:document-list",
+        "issuer:document-export",
+        "issuer:accesslog-list",
+        "issuer:accesslog-export",
+        "issuer:integritylog-list",
+        "issuer:integritylog-export",
+        "issuer:kpi-report",
+        "issuer:kpi-report-download",
+    )
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="ops", password="test-pass-123")
+        grant_manage_portal(self.user)
+        self.client.force_login(self.user)
+
+    def test_mutating_methods_rejected_on_data_views(self):
+        for url_name in self.READ_ONLY_GET_URLS:
+            url = reverse(url_name)
+            for method in ("post", "put", "patch", "delete"):
+                response = getattr(self.client, method)(url)
+                self.assertEqual(
+                    response.status_code,
+                    405,
+                    msg=f"{method.upper()} {url_name} should be read-only",
+                )
