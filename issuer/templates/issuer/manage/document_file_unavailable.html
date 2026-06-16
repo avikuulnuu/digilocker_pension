@@ -4,56 +4,31 @@
   <h1>Document file unavailable</h1>
   <p class="sub">Document #{{ object.id }} — {{ object.authorization_number }} / {{ object.document_type }}</p>
   <div class="panel">
-    <p style="margin:0 0 12px;">The file could not be opened for preview.</p>
-    {% if object.file_name %}
-    <p><strong>Stored file name:</strong> {{ object.file_name }}</p>
-    <p><strong>Primary expected path:</strong> {{ expected_path }}</p>
-    {% else %}
-    <p>No <code>file_name</code> is stored for this record.</p>
-    {% endif %}
+    <p style="margin:0 0 16px;">File does not exist.</p>
 
-    {% if file_debug %}
-    <h2 style="margin:24px 0 12px;font-size:1rem;">Path diagnostics (from app server)</h2>
-    <dl class="detail-grid">
-      <dt>BASE_STORAGE_PATH</dt>
-      <dd><code>{{ file_debug.base_storage_path }}</code></dd>
-      <dt>Base is directory</dt><dd>{{ file_debug.base_is_dir }}</dd>
-      <dt>Base readable</dt><dd>{{ file_debug.base_readable }}</dd>
-      <dt>Stored file name (normalized)</dt><dd><code>{{ file_debug.normalized_file_name }}</code></dd>
-      <dt>Resolved file name</dt><dd><code>{{ file_debug.effective_file_name }}</code></dd>
-      <dt>Resolved path</dt>
-      <dd>{% if file_debug.resolved_path %}<code>{{ file_debug.resolved_path }}</code>{% else %}— (none found){% endif %}</dd>
-    </dl>
-    {% if file_debug.candidates %}
-    <table style="margin-top:16px;">
-      <thead>
-        <tr><th>Candidate path</th><th>Exists</th><th>Is file</th><th>Readable</th></tr>
-      </thead>
-      <tbody>
-        {% for row in file_debug.candidates %}
-        <tr>
-          <td><code>{{ row.path }}</code></td>
-          <td>{{ row.exists }}</td>
-          <td>{{ row.is_file }}</td>
-          <td>{{ row.readable }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% endif %}
-    {% if file_debug.matching_entries %}
-    <p style="margin-top:16px;"><strong>Files in base folder matching name prefix:</strong></p>
-    <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;">
-      {% for entry in file_debug.matching_entries %}
-      <li><code>{{ entry }}</code></li>
+    <h2 style="margin:0 0 12px;font-size:1rem;">Expected paths</h2>
+    {% if expected_paths %}
+    <ul style="margin:0 0 16px;padding-left:20px;font-size:14px;">
+      {% for path in expected_paths %}
+      <li><code>{{ path }}</code></li>
       {% endfor %}
     </ul>
-    {% elif file_debug.list_error %}
-    <p style="margin-top:16px;color:#9a3412;"><strong>Could not list storage folder:</strong> {{ file_debug.list_error }}</p>
+    {% elif expected_path %}
+    <p><code>{{ expected_path }}</code></p>
     {% else %}
-    <p style="margin-top:16px;">No matching filenames found in the storage folder (prefix search).</p>
+    <p>No storage path could be resolved for this record.</p>
     {% endif %}
-    {% endif %}
+
+    <h2 style="margin:0 0 12px;font-size:1rem;">File attributes (database)</h2>
+    <dl class="detail-grid">
+      <dt>File name</dt><dd>{{ object.file_name|default:"—" }}</dd>
+      <dt>Resolved file name</dt><dd>{{ effective_file_name|default:"—" }}</dd>
+      <dt>File exists</dt><dd>{{ object.file_exists }}</dd>
+      <dt>Is active</dt><dd>{{ object.is_active }}</dd>
+      <dt>File checksum</dt><dd>{{ object.file_checksum|default:"—" }}</dd>
+      <dt>File size (bytes)</dt><dd>{{ object.file_size_bytes|default:"—" }}</dd>
+      <dt>File last checked</dt><dd>{{ object.file_last_checked_at|default:"—" }}</dd>
+    </dl>
 
     <div class="actions" style="margin-top:18px;">
       <a class="btn" href="{% url 'issuer:document-detail' object.pk %}">Back to details</a>

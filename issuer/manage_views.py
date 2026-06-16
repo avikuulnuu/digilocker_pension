@@ -37,7 +37,7 @@ from issuer.manage_filters import (
 )
 from issuer.models import AccessLog, Document, IntegrityLog
 from issuer.services.file_service import (
-    diagnose_document_file,
+    candidate_paths,
     effective_file_name,
     find_readable_path,
     resolve_path,
@@ -117,8 +117,35 @@ def manage_hub(request):
 # --- Documents ---
 
 
+def _document_preview_blocked(doc: Document) -> bool:
+    """Skip on-disk lookup when DB flags indicate no previewable file."""
+    return not doc.is_active and not doc.file_exists
+
+
 def _document_file_available(doc: Document) -> bool:
+    if _document_preview_blocked(doc):
+        return False
     return find_readable_path(doc) is not None
+
+
+def _document_unavailable_context(doc: Document) -> dict:
+    return {
+        "object": doc,
+        "expected_path": resolve_path(doc),
+        "expected_paths": candidate_paths(doc),
+        "effective_file_name": effective_file_name(
+            doc.file_name, document_type=doc.document_type
+        ),
+    }
+
+
+def _render_document_file_unavailable(request, doc: Document):
+    return render(
+        request,
+        "issuer/manage/document_file_unavailable.html",
+        _document_unavailable_context(doc),
+        status=404,
+    )
 
 
 def document_list(request):
@@ -158,18 +185,12 @@ def document_detail(request, pk):
 def document_view_file(request, pk):
     """Serve the stored document file for in-browser preview (manage UI only)."""
     doc = get_object_or_404(Document, pk=pk)
+    if _document_preview_blocked(doc):
+        return _render_document_file_unavailable(request, doc)
+
     full_path = find_readable_path(doc)
     if not full_path:
-        return render(
-            request,
-            "issuer/manage/document_file_unavailable.html",
-            {
-                "object": doc,
-                "expected_path": resolve_path(doc),
-                "file_debug": diagnose_document_file(doc),
-            },
-            status=404,
-        )
+        return _render_document_file_unavailable(request, doc)
     with open(full_path, "rb") as f:
         content = f.read()
 
