@@ -320,15 +320,20 @@ When Gunicorn runs **behind nginx** (typical production), Django’s default `RE
    DEBUG=False
    ADMIN_IP_ALLOWLIST=10.181.30.42,10.181.30.0/24
    TRUST_X_FORWARDED_FOR=True
+    TRUSTED_PROXY_IPS=127.0.0.1,::1
    ```
 2. In nginx (inside the `location` that proxies to Gunicorn):
    ```nginx
    proxy_set_header Host $host;
    proxy_set_header X-Real-IP $remote_addr;
-   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-For $remote_addr;
    proxy_set_header X-Forwarded-Proto $scheme;
    ```
 3. Restart gunicorn/nginx after changing `.env`.
+
+Management login attempts are tracked by `django-axes` in PostgreSQL, so all
+Gunicorn workers share the same lockout state without Redis. Run migrations
+after installing or upgrading dependencies.
 
 If access is still denied, check the application log for a line like `Restricted admin/manage access denied for client IP '...'` — that string is the IP you must allow (or fix proxy headers if it shows `127.0.0.1` while `TRUST_X_FORWARDED_FOR=True`).
 

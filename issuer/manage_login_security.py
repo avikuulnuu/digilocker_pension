@@ -1,77 +1,55 @@
-"""Failed-login tracking and lockout for the management console."""
+"""Database-backed failed-login tracking for the management console."""
 
 from __future__ import annotations
 
-import time
-
 from django.conf import settings
-from django.core.cache import cache
+from django.contrib.auth.signals import user_login_failed
+from django.utils import timezone
 
-from config.ip_allowlist import get_client_ip
+from axes.handlers.proxy import AxesProxyHandler
+from axes.models import AccessAttempt
 
-FAILURE_CACHE_PREFIX = "manage_login:fail:"
-LOCK_CACHE_PREFIX = "manage_login:lock:"
-
-
-def _client_key(request) -> str:
-    ip = get_client_ip(
-        request,
-        trust_x_forwarded_for=getattr(settings, "TRUST_X_FORWARDED_FOR", False),
-    )
-    return ip or "unknown"
+from config.ip_allowlist import get_axes_client_ip
 
 
-def _failure_cache_key(request) -> str:
-    return f"{FAILURE_CACHE_PREFIX}{_client_key(request)}"
+def is_outside_manage_login(request, credentials=None) -> bool:
+    return request.path != "/issuer/manage/login/"
 
 
-def _lock_cache_key(request) -> str:
-    return f"{LOCK_CACHE_PREFIX}{_client_key(request)}"
+def axes_lockout_response(request, original_response, credentials=None):
+    """Keep the management login page and its lockout message."""
+    return original_response
 
 
 def get_failure_count(request) -> int:
-    return int(cache.get(_failure_cache_key(request), 0))
+    return AxesProxyHandler.get_failures(request)
 
 
 def is_locked(request) -> tuple[bool, int]:
-    """Return (locked, seconds_remaining). Works with LocMemCache (no cache.ttl)."""
-    lock_until = cache.get(_lock_cache_key(request))
-    if lock_until is None:
+    locked = AxesProxyHandler.is_locked(request)
+    if not locked:
         return False, 0
-    try:
-        remaining = int(float(lock_until) - time.time())
-    except (TypeError, ValueError):
-        cache.delete(_lock_cache_key(request))
-        return False, 0
-    if remaining <= 0:
-        cache.delete(_lock_cache_key(request))
-        return False, 0
-    return True, remaining
+
+    latest_attempt = (
+        AccessAttempt.objects.filter(ip_address=get_axes_client_ip(request))
+        .order_by("-attempt_time")
+        .first()
+    )
+    if latest_attempt is None:
+        return True, settings.MANAGE_LOGIN_LOCKOUT_MINUTES * 60
+    lock_until = latest_attempt.attempt_time + settings.AXES_COOLOFF_TIME
+    seconds_left = max(0, int((lock_until - timezone.now()).total_seconds()))
+    return True, seconds_left
 
 
 def record_failed_login(request) -> int:
-    """Increment failure count; apply lockout when threshold reached. Returns new count."""
-    fail_key = _failure_cache_key(request)
-    lock_key = _lock_cache_key(request)
-    lockout_seconds = settings.MANAGE_LOGIN_LOCKOUT_MINUTES * 60
-    failure_ttl = lockout_seconds
-
-    try:
-        count = cache.incr(fail_key)
-    except ValueError:
-        cache.set(fail_key, 1, timeout=failure_ttl)
-        count = 1
-
-    max_failures = settings.MANAGE_LOGIN_MAX_FAILURES
-    if count >= max_failures:
-        cache.set(
-            lock_key,
-            time.time() + lockout_seconds,
-            timeout=lockout_seconds,
-        )
-    return count
+    user_login_failed.send(
+        sender=__name__,
+        credentials={"username": request.POST.get("username", "")},
+        request=request,
+    )
+    return get_failure_count(request)
 
 
 def clear_failed_logins(request) -> None:
-    cache.delete(_failure_cache_key(request))
-    cache.delete(_lock_cache_key(request))
+    AxesProxyHandler.reset_attempts(ip_address=get_axes_client_ip(request))

@@ -14,13 +14,35 @@ class IpAllowlistHelpersTest(TestCase):
         self.assertFalse(ip_is_allowed("8.8.8.8", allowed))
 
     def test_get_client_ip_honors_xff_when_trusted(self):
-        request = RequestFactory().get("/", HTTP_X_FORWARDED_FOR="203.0.113.1, 10.0.0.1")
+        request = RequestFactory().get("/", HTTP_X_FORWARDED_FOR="203.0.113.1")
         self.assertEqual(
             get_client_ip(request, trust_x_forwarded_for=True),
             "203.0.113.1",
         )
         self.assertNotEqual(
             get_client_ip(request, trust_x_forwarded_for=False),
+            "203.0.113.1",
+        )
+
+    def test_get_client_ip_prefers_proxy_overwritten_real_ip(self):
+        request = RequestFactory().get(
+            "/",
+            HTTP_X_FORWARDED_FOR="192.0.2.10, 203.0.113.1",
+            HTTP_X_REAL_IP="203.0.113.1",
+        )
+        self.assertEqual(
+            get_client_ip(request, trust_x_forwarded_for=True),
+            "203.0.113.1",
+        )
+
+    def test_get_client_ip_ignores_headers_from_untrusted_peer(self):
+        request = RequestFactory().get(
+            "/",
+            HTTP_X_FORWARDED_FOR="127.0.0.1",
+            REMOTE_ADDR="203.0.113.1",
+        )
+        self.assertEqual(
+            get_client_ip(request, trust_x_forwarded_for=True),
             "203.0.113.1",
         )
 
@@ -55,6 +77,17 @@ class RestrictedAdminIPMiddlewareTest(TestCase):
         request = RequestFactory().get("/issuer/manage/")
         request.META["REMOTE_ADDR"] = "203.0.113.50"
         response = self.middleware(request)
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(TRUST_X_FORWARDED_FOR=True)
+    def test_blocks_spoofed_allowlisted_header_from_untrusted_peer(self):
+        request = RequestFactory().get(
+            "/issuer/manage/",
+            HTTP_X_FORWARDED_FOR="127.0.0.1",
+            REMOTE_ADDR="203.0.113.50",
+        )
+        response = self.middleware(request)
+
         self.assertEqual(response.status_code, 403)
 
     def test_blocks_django_admin_from_other_ip(self):

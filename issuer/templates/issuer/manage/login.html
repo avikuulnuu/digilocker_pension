@@ -21,14 +21,17 @@
       .field label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
       .field input { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
       .captcha-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-      .captcha-row img { border-radius: 6px; border: 1px solid #e2e8f0; }
+      .captcha-row img { width: 220px; height: 70px; object-fit: contain; border-radius: 6px; border: 2px solid #64748b; }
       .captcha-row input { width: 8rem; flex: 0 0 auto; }
+      .captcha-refresh { margin-top: 8px; border: 1px solid #64748b; background: #fff; color: #1e293b; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+      .captcha-refresh:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
       .btn { width: 100%; background: #2563eb; color: #fff; border: none; padding: 12px; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 600; }
       .errors { color: #dc2626; font-size: 14px; margin-bottom: 16px; }
       .messages { list-style: none; margin: 0 0 16px; padding: 12px; border-radius: 8px; font-size: 14px; }
       .messages li { margin: 0; }
       .messages:has(li) { background: #fef2f2; color: #b91c1c; }
       .warn { background: #fffbeb; color: #92400e; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+      .login-status { background: #fef2f2; color: #b91c1c; padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
       .hint { color: #64748b; font-size: 12px; margin-top: 6px; }
     </style>
   </head>
@@ -37,7 +40,9 @@
       <h1>Management console</h1>
       <p class="sub">DigiLocker Issuer — sign in with an authorized staff account.</p>
 
-      {% if failed_attempts %}
+      {% if login_status_message %}
+      <div class="login-status" role="alert">{{ login_status_message }}</div>
+      {% elif failed_attempts and not messages %}
       <p class="warn">
         Failed sign-in attempts from your network: {{ failed_attempts }} of {{ max_failures }}.
         {% if attempts_remaining %}
@@ -54,7 +59,7 @@
       </ul>
       {% endif %}
 
-      {% if form.non_field_errors %}
+      {% if form.non_field_errors and not login_status_message %}
       <div class="errors">{{ form.non_field_errors }}</div>
       {% endif %}
 
@@ -74,7 +79,8 @@
             {{ form.captcha }}
           </div>
           {% if form.captcha.errors %}<div class="errors">{{ form.captcha.errors }}</div>{% endif %}
-          <p class="hint">Solve the arithmetic problem shown. Click the image to get a new one.</p>
+          <button type="button" class="captcha-refresh" id="captcha-refresh">Refresh security check</button>
+          <p class="hint">Solve the arithmetic problem shown.</p>
         </div>
         {% if form.username.errors %}<div class="errors">{{ form.username.errors }}</div>{% endif %}
         {% if form.password.errors %}<div class="errors">{{ form.password.errors }}</div>{% endif %}
@@ -82,5 +88,26 @@
         <button type="submit" class="btn">Sign in</button>
       </form>
     </div>
+    <script>
+      document.getElementById("captcha-refresh").addEventListener("click", async function () {
+        const button = this;
+        button.disabled = true;
+        try {
+          const response = await fetch("{% url 'captcha-refresh' %}", {
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            credentials: "same-origin"
+          });
+          if (!response.ok) throw new Error("CAPTCHA refresh failed");
+          const captcha = await response.json();
+          document.querySelector("img.captcha").src = captcha.image_url;
+          document.getElementById("id_captcha_0").value = captcha.key;
+          const answer = document.getElementById("id_captcha_1");
+          answer.value = "";
+          answer.focus();
+        } finally {
+          button.disabled = false;
+        }
+      });
+    </script>
   </body>
 </html>

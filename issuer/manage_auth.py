@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.views import LoginView
+from django.core.exceptions import NON_FIELD_ERRORS
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.http import require_http_methods
@@ -48,9 +49,9 @@ class ManagePortalLoginView(LoginView):
         locked, seconds_left = is_locked(request)
         if locked:
             minutes = max(1, (seconds_left + 59) // 60)
-            messages.error(
-                request,
-                f"Too many failed sign-in attempts. Try again in about {minutes} minute(s).",
+            self.login_status_message = (
+                f"Too many failed sign-in attempts. Try again in about {minutes} "
+                "minute(s)."
             )
             return self.render_to_response(self.get_context_data())
         return super().dispatch(request, *args, **kwargs)
@@ -63,25 +64,33 @@ class ManagePortalLoginView(LoginView):
         context["max_failures"] = max_failures
         context["attempts_remaining"] = max(0, max_failures - failures)
         context["lockout_minutes"] = settings.MANAGE_LOGIN_LOCKOUT_MINUTES
+        context["login_status_message"] = getattr(
+            self,
+            "login_status_message",
+            "",
+        )
         return context
 
     def get_success_url(self):
         return reverse("issuer:manage-hub")
 
     def form_invalid(self, form):
-        count = record_failed_login(self.request)
+        if not form.has_error(NON_FIELD_ERRORS, "invalid_login"):
+            return super().form_invalid(form)
+
+        count = get_failure_count(self.request)
         max_failures = settings.MANAGE_LOGIN_MAX_FAILURES
         if count >= max_failures:
-            messages.error(
-                self.request,
+            self.login_status_message = (
                 f"Too many failed sign-in attempts. This location is locked for "
-                f"{settings.MANAGE_LOGIN_LOCKOUT_MINUTES} minutes.",
+                f"{settings.MANAGE_LOGIN_LOCKOUT_MINUTES} minutes."
             )
         else:
             remaining = max_failures - count
-            messages.warning(
-                self.request,
-                f"Sign-in failed. {remaining} attempt(s) remaining before temporary lockout.",
+            self.login_status_message = (
+                f"Sign-in failed. {count} of {max_failures} failed attempts; "
+                f"{remaining} attempt(s) remaining before a "
+                f"{settings.MANAGE_LOGIN_LOCKOUT_MINUTES}-minute lockout."
             )
         return super().form_invalid(form)
 

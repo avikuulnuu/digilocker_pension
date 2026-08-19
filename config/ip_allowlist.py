@@ -6,16 +6,34 @@ import ipaddress
 from typing import Iterable
 
 
-def get_client_ip(request, *, trust_x_forwarded_for: bool) -> str:
-    """Extract the client IP, optionally honoring proxy headers behind a trusted reverse proxy."""
-    if trust_x_forwarded_for:
-        xff = request.META.get("HTTP_X_FORWARDED_FOR")
-        if xff:
-            return xff.split(",")[0].strip()
+def get_client_ip(
+    request,
+    *,
+    trust_x_forwarded_for: bool,
+    trusted_proxy_ips: Iterable[str] = ("127.0.0.1", "::1"),
+) -> str:
+    """Extract the client IP, honoring headers only from a trusted proxy."""
+    remote_addr = (request.META.get("REMOTE_ADDR") or "").strip()
+    trusted_proxies = parse_ip_allowlist(trusted_proxy_ips)
+    if trust_x_forwarded_for and ip_is_allowed(remote_addr, trusted_proxies):
         real_ip = request.META.get("HTTP_X_REAL_IP")
         if real_ip:
             return real_ip.strip()
-    return (request.META.get("REMOTE_ADDR") or "").strip()
+        xff = request.META.get("HTTP_X_FORWARDED_FOR")
+        if xff:
+            return xff.split(",")[-1].strip()
+    return remote_addr
+
+
+def get_axes_client_ip(request) -> str:
+    """Resolve Axes client IP through the same trusted-proxy policy."""
+    from django.conf import settings
+
+    return get_client_ip(
+        request,
+        trust_x_forwarded_for=getattr(settings, "TRUST_X_FORWARDED_FOR", False),
+        trusted_proxy_ips=getattr(settings, "TRUSTED_PROXY_IPS", ()),
+    )
 
 
 def normalize_client_ip(ip_str: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:

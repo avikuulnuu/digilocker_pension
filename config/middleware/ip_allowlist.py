@@ -31,6 +31,7 @@ class RestrictedAdminIPMiddleware:
             client_ip = get_client_ip(
                 request,
                 trust_x_forwarded_for=getattr(settings, "TRUST_X_FORWARDED_FOR", False),
+                trusted_proxy_ips=getattr(settings, "TRUSTED_PROXY_IPS", ()),
             )
             allowlist = getattr(settings, "RESTRICTED_ADMIN_IP_ALLOWLIST", [])
             logger.warning(
@@ -60,5 +61,6 @@ class RestrictedAdminIPMiddleware:
         client_ip = get_client_ip(
             request,
             trust_x_forwarded_for=getattr(settings, "TRUST_X_FORWARDED_FOR", False),
+            trusted_proxy_ips=getattr(settings, "TRUSTED_PROXY_IPS", ()),
         )
         return ip_is_allowed(client_ip, allowed)

@@ -1,7 +1,8 @@
 import sys
+from datetime import timedelta
+from pathlib import Path
 
 import environ
-from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -10,6 +11,7 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
     ADMIN_IP_ALLOWLIST=(list, []),
     TRUST_X_FORWARDED_FOR=(bool, False),
+    TRUSTED_PROXY_IPS=(list, ["127.0.0.1", "::1"]),
     INTEGRITY_MODE=(str, "STRICT"),
     IDENTITY_VALIDATION_MODE=(str, "STRICT"),
     LENIENT_NAME_MATCH_THRESHOLD=(float, 0.70),
@@ -39,6 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.postgres",
+    "axes",
     "captcha",
     "issuer",
 ]
@@ -49,6 +52,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "axes.middleware.AxesMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -115,9 +119,14 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/issuer/manage/login/"
 LOGIN_REDIRECT_URL = "/issuer/manage/"
 LOGOUT_REDIRECT_URL = "/issuer/manage/login/"
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
 
 # --- Admin / manage console network restriction ---
 TRUST_X_FORWARDED_FOR = env("TRUST_X_FORWARDED_FOR")
+TRUSTED_PROXY_IPS = env.list("TRUSTED_PROXY_IPS")
 RESTRICTED_ADMIN_IP_ALLOWLIST = env.list("ADMIN_IP_ALLOWLIST")
 if not RESTRICTED_ADMIN_IP_ALLOWLIST and (DEBUG or "test" in sys.argv):
     RESTRICTED_ADMIN_IP_ALLOWLIST = ["127.0.0.1", "::1"]
@@ -181,9 +190,26 @@ ISSUER_API_LOG_BACKUP_COUNT = env("ISSUER_API_LOG_BACKUP_COUNT")
 # --- Management console login protection ---
 MANAGE_LOGIN_MAX_FAILURES = env("MANAGE_LOGIN_MAX_FAILURES")
 MANAGE_LOGIN_LOCKOUT_MINUTES = env("MANAGE_LOGIN_LOCKOUT_MINUTES")
+AXES_HANDLER = "axes.handlers.database.AxesDatabaseHandler"
+AXES_FAILURE_LIMIT = MANAGE_LOGIN_MAX_FAILURES
+AXES_COOLOFF_TIME = timedelta(minutes=MANAGE_LOGIN_LOCKOUT_MINUTES)
+AXES_LOCKOUT_PARAMETERS = ["ip_address"]
+AXES_CLIENT_IP_CALLABLE = "config.ip_allowlist.get_axes_client_ip"
+AXES_WHITELIST_CALLABLE = "issuer.manage_login_security.is_outside_manage_login"
+AXES_LOCKOUT_CALLABLE = "issuer.manage_login_security.axes_lockout_response"
+AXES_RESET_ON_SUCCESS = True
+AXES_DISABLE_ACCESS_LOG = True
+AXES_ENABLE_ACCESS_FAILURE_LOG = False
+AXES_SENSITIVE_PARAMETERS = ["username", "captcha_0", "captcha_1", "csrfmiddlewaretoken"]
 CAPTCHA_CHALLENGE_FUNCT = "captcha.helpers.math_challenge"
-CAPTCHA_FONT_SIZE = 28
+CAPTCHA_IMAGE_SIZE = (220, 70)
+CAPTCHA_FONT_SIZE = 36
 CAPTCHA_LENGTH = 4
+CAPTCHA_LETTER_ROTATION = (-8, 8)
+CAPTCHA_NOISE_FUNCTIONS = ("captcha.helpers.noise_dots",)
+CAPTCHA_FILTER_FUNCTIONS = ()
+CAPTCHA_FOREGROUND_COLOR = "#111827"
+CAPTCHA_BACKGROUND_COLOR = "#ffffff"
 # django-simple-captcha caches this at import time; must be set here for manage.py test.
 CAPTCHA_TEST_MODE = "test" in sys.argv
 
