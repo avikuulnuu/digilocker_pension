@@ -8,8 +8,6 @@ from lxml import etree
 
 logger = logging.getLogger("issuer")
 
-NS = {"dl": "http://tempuri.org/"}
-
 # DigiLocker portal maps the authorization search field to AUTHN (not UDF1).
 AUTHN_TAG = "AUTHN"
 
@@ -33,6 +31,17 @@ class PullURIRequestData:
     dob: str = ""
     photo: str = ""
     udfs: dict = field(default_factory=dict)
+
+
+def _direct_child(parent, local_name):
+    return next(
+        (
+            child
+            for child in parent
+            if etree.QName(child).localname == local_name
+        ),
+        None,
+    )
 
 
 def parse_pull_uri_request(raw_xml: bytes) -> PullURIRequestData:
@@ -61,18 +70,13 @@ def parse_pull_uri_request(raw_xml: bytes) -> PullURIRequestData:
         if not attr_val:
             raise XMLParseError(f"Missing mandatory attribute: {attr_name}")
 
-    # DocDetails
-    doc_details = root.find("dl:DocDetails", NS)
-    if doc_details is None:
-        # Try without namespace
-        doc_details = root.find("DocDetails")
+    # DigiLocker has used both the legacy tempuri namespace and its issuer schema.
+    doc_details = _direct_child(root, "DocDetails")
     if doc_details is None:
         raise XMLParseError("Missing DocDetails element")
 
     def _text(parent, tag):
-        el = parent.find(f"dl:{tag}", NS)
-        if el is None:
-            el = parent.find(tag)
+        el = _direct_child(parent, tag)
         return (el.text or "").strip() if el is not None else ""
 
     data.doc_type = _text(doc_details, "DocType")
