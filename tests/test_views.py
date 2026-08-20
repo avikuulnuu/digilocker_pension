@@ -9,12 +9,13 @@ from datetime import date
 from unittest.mock import patch
 
 from django.conf import settings
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from issuer.models import AccessLog, Document
 
 
+@override_settings(DIGILOCKER_HMAC_ENCODING_MODE="STANDARD")
 class PullURIViewTest(TestCase):
     def setUp(self):
         self.base_path = tempfile.mkdtemp()
@@ -50,6 +51,11 @@ class PullURIViewTest(TestCase):
         return base64.b64encode(
             hmac_mod.new(key, body, hashlib.sha256).digest()
         ).decode()
+
+    def _make_digilocker_hex_signed_request(self, body: bytes):
+        key = settings.DIGILOCKER_API_KEY.encode()
+        digest_hex = hmac_mod.new(key, body, hashlib.sha256).hexdigest()
+        return base64.b64encode(digest_hex.encode("ascii")).decode()
 
     def test_pull_uri_success(self):
         ts = timezone.now().isoformat()
@@ -126,6 +132,40 @@ class PullURIViewTest(TestCase):
         )
         self.doc.refresh_from_db()
         self.assertEqual(self.doc.access_count, 1)
+
+    @override_settings(DIGILOCKER_HMAC_ENCODING_MODE="DIGILOCKER_HEX")
+    def test_pull_uri_accepts_digilocker_hex_hmac_mode(self):
+        ts = timezone.now().isoformat()
+        keyhash = hashlib.sha256(
+            (settings.DIGILOCKER_API_KEY + ts).encode()
+        ).hexdigest()
+        body = (
+            f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            f'<PullURIRequest xmlns="https://www.digitallocker.gov.in/schema/issuer/v1/pullurirequest"'
+            f' ver="3.0" ts="{ts}" txn="digilocker-hex-txn"'
+            f' orgId="{settings.DIGILOCKER_ISSUER_ID}"'
+            f' keyhash="{keyhash}" format="pdf">'
+            f"<DocDetails>"
+            f"<DocType>PECER</DocType>"
+            f"<FullName>Sunil Kumar</FullName>"
+            f"<DigiLockerId>test-digilocker-id</DigiLockerId>"
+            f"<AUTHN>AUTH100</AUTHN>"
+            f"</DocDetails>"
+            f"</PullURIRequest>"
+        ).encode()
+
+        response = self.client.post(
+            "/api/pulluri",
+            data=body,
+            content_type="application/xml",
+            HTTP_X_DIGILOCKER_HMAC=self._make_digilocker_hex_signed_request(body),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Status="1"', response.content)
+        self.assertTrue(
+            AccessLog.objects.filter(txn_id="digilocker-hex-txn").exists()
+        )
 
     def test_pull_uri_success_without_dob(self):
         ts = timezone.now().isoformat()
