@@ -146,6 +146,7 @@ def pull_uri_view(request):
             txn=txn,
             doc_content_b64=result["doc_content_b64"],
             data_content_b64=result["data_content_b64"],
+            requested_format=request_data.format,
         )
 
         elapsed = int((time.monotonic() - start_time) * 1000)

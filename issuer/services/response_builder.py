@@ -3,12 +3,14 @@
 from lxml import etree
 
 from issuer.models import Document
+from issuer.services.pull_doc_log import request_format_diagnostics
 
 NS = "http://tempuri.org/"
 
 
 def build_success_response(doc: Document, uri: str, timestamp: str, txn: str,
-                           doc_content_b64: str, data_content_b64: str) -> bytes:
+                           doc_content_b64: str, data_content_b64: str,
+                           requested_format: str = "xml") -> bytes:
     """Build a successful PullURIResponse XML."""
     root = etree.Element("PullURIResponse", nsmap={"ns2": NS})
 
@@ -30,9 +32,22 @@ def build_success_response(doc: Document, uri: str, timestamp: str, txn: str,
     uri_el = etree.SubElement(doc_details, "URI")
     uri_el.text = uri
 
+    normalized_format = requested_format.strip().lower()
+    doc_content_included = normalized_format in {"pdf", "both"}
+    request_format_diagnostics(
+        txn=txn,
+        requested_format=(
+            normalized_format
+            if normalized_format in {"xml", "pdf", "both"}
+            else "unsupported"
+        ),
+        doc_content_included=doc_content_included,
+    )
+
     # DocContent (Base64 PDF)
-    doc_content_el = etree.SubElement(doc_details, "DocContent")
-    doc_content_el.text = doc_content_b64
+    if doc_content_included:
+        doc_content_el = etree.SubElement(doc_details, "DocContent")
+        doc_content_el.text = doc_content_b64
 
     # DataContent (Base64 XML metadata)
     data_content_el = etree.SubElement(doc_details, "DataContent")

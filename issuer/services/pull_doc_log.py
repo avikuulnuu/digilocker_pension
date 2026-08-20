@@ -2,6 +2,8 @@
 
 import logging
 
+from django.conf import settings
+
 from issuer.log_safety import sanitize_log_context
 
 logger = logging.getLogger("issuer")
@@ -55,6 +57,21 @@ def auth_ok(*, txn=""):
 
 def auth_failed(*, txn="", reason="", request_ip=""):
     _log(logging.WARNING, "auth_failed", reason, txn=txn, request_ip=request_ip)
+
+
+def request_format_diagnostics(
+    *, txn="", requested_format="", doc_content_included=False
+):
+    if not settings.ISSUER_VERBOSE_LOGGING:
+        return
+    _log(
+        logging.DEBUG,
+        "request_format",
+        "PullURI response format selected",
+        txn=txn,
+        requested_format=requested_format,
+        doc_content_included=doc_content_included,
+    )
 
 
 def stage_ok(stage, message="", **context):

@@ -90,12 +90,46 @@ class PullURIViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Status="1"', response.content)
         self.assertIn(b"<URI>", response.content)
+        self.assertIn(b"<DocContent>", response.content)
+        self.assertIn(b"<DataContent>", response.content)
 
         self.assertTrue(AccessLog.objects.filter(txn_id="test-txn").exists())
 
         self.doc.refresh_from_db()
         self.assertEqual(self.doc.access_count, 1)
         self.assertIsNotNone(self.doc.last_accessed_at)
+
+    def test_pull_uri_xml_format_omits_doc_content(self):
+        ts = timezone.now().isoformat()
+        keyhash = hashlib.sha256(
+            (settings.DIGILOCKER_API_KEY + ts).encode()
+        ).hexdigest()
+        body = (
+            f'<?xml version="1.0" encoding="UTF-8"?>'
+            f'<PullURIRequest xmlns="http://tempuri.org/" ver="3.0"'
+            f' ts="{ts}" txn="test-txn-xml-format"'
+            f' orgId="{settings.DIGILOCKER_ISSUER_ID}"'
+            f' keyhash="{keyhash}" format="xml">'
+            f"<DocDetails>"
+            f"<DocType>PECER</DocType>"
+            f"<DigiLockerId>dl-test</DigiLockerId>"
+            f"<FullName>Sunil Kumar</FullName>"
+            f"<DOB>31-12-1990</DOB>"
+            f"<AUTHN>AUTH100</AUTHN>"
+            f"</DocDetails>"
+            f"</PullURIRequest>"
+        ).encode()
+
+        response = self.client.post(
+            "/api/pulluri",
+            data=body,
+            content_type="application/xml",
+            HTTP_X_DIGILOCKER_HMAC=self._make_signed_request(body),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(b"<DocContent>", response.content)
+        self.assertIn(b"<DataContent>", response.content)
 
     def test_pull_uri_success_with_digilocker_issuer_namespace(self):
         ts = timezone.now().isoformat()
