@@ -15,6 +15,21 @@ from django.utils import timezone
 from issuer.models import AccessLog, Document
 
 
+class HealthViewTest(TestCase):
+    def test_get_returns_liveness_response(self):
+        response = self.client.get("/api/health")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"hello, im alive")
+        self.assertEqual(response["Content-Type"], "text/plain")
+
+    def test_post_returns_method_not_allowed(self):
+        response = self.client.post("/api/health")
+
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response["Allow"], "GET")
+
+
 @override_settings(DIGILOCKER_HMAC_ENCODING_MODE="STANDARD")
 class PullURIViewTest(TestCase):
     def setUp(self):

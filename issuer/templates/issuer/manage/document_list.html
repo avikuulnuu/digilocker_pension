@@ -106,7 +106,7 @@
           <td>{% if obj.is_active %}Yes{% else %}No{% endif %}</td>
           <td>{{ obj.created_at|date:"Y-m-d H:i" }}</td>
           <td>
-            <a href="{% url 'issuer:document-detail' obj.pk %}">Details</a>
+            <a href="{% url 'issuer:document-detail' obj.pk %}?{{ detail_query }}">Details</a>
             {% if obj.file_name %}
             · <a href="{% url 'issuer:document-view-file' obj.pk %}" target="_blank" rel="noopener">Document</a>
             {% endif %}

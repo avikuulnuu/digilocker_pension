@@ -4,7 +4,7 @@
   <h1>Document #{{ object.id }}</h1>
   <p class="sub">{{ object.authorization_number }} / {{ object.document_type }}</p>
   <div class="actions">
-    <a class="btn btn-outline" href="{% url 'issuer:document-list' %}">Back to list</a>
+    <a class="btn btn-outline" href="{{ list_url }}">Back to list</a>
     {% if can_view_file %}
     <a class="btn btn-secondary" href="{{ file_view_url }}" target="_blank" rel="noopener">View document</a>
     {% endif %}

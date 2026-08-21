@@ -53,6 +53,14 @@ def _paginate(request, queryset):
     return paginator.get_page(page_number)
 
 
+def _list_url(request, url_name, filter_fields):
+    filters = get_filter_params(request, filter_fields)
+    page = (request.GET.get("page") or "").strip()
+    query = build_filter_query(filters, page=page if page.isdigit() else None)
+    url = reverse(url_name)
+    return f"{url}?{query}" if query else url
+
+
 def _serialize_export_value(value):
     if value is None:
         return ""
@@ -155,13 +163,15 @@ def document_list(request):
     qs = filter_documents(params=filters)
     choices = document_filter_choices()
     query = build_filter_query(filters)
+    page_obj = _paginate(request, qs)
     return render(
         request,
         "issuer/manage/document_list.html",
         {
-            "page_obj": _paginate(request, qs),
+            "page_obj": page_obj,
             "filters": filters,
             "filter_query": query,
+            "detail_query": build_filter_query(filters, page=page_obj.number),
             "clear_url": reverse("issuer:document-list"),
             "document_types": choices["document_types"],
         },
@@ -177,6 +187,9 @@ def document_detail(request, pk):
         {
             "object": obj,
             "can_view_file": can_view_file,
+            "list_url": _list_url(
+                request, "issuer:document-list", DOCUMENT_FILTER_FIELDS
+            ),
             "file_view_url": reverse("issuer:document-view-file", kwargs={"pk": pk})
             if can_view_file
             else "",
@@ -221,6 +234,7 @@ def accesslog_list(request):
     qs = filter_access_logs(params=filters).select_related("document")
     choices = accesslog_filter_choices()
     query = build_filter_query(filters)
+    page_obj = _paginate(request, qs)
     export_url = reverse("issuer:accesslog-export")
     if query:
         export_url = f"{export_url}?{query}"
@@ -228,9 +242,10 @@ def accesslog_list(request):
         request,
         "issuer/manage/accesslog_list.html",
         {
-            "page_obj": _paginate(request, qs),
+            "page_obj": page_obj,
             "filters": filters,
             "filter_query": query,
+            "detail_query": build_filter_query(filters, page=page_obj.number),
             "export_url": export_url,
             "clear_url": reverse("issuer:accesslog-list"),
             "document_types": choices["document_types"],
@@ -240,7 +255,16 @@ def accesslog_list(request):
 
 def accesslog_detail(request, pk):
     obj = get_object_or_404(AccessLog.objects.select_related("document"), pk=pk)
-    return render(request, "issuer/manage/accesslog_detail.html", {"object": obj})
+    return render(
+        request,
+        "issuer/manage/accesslog_detail.html",
+        {
+            "object": obj,
+            "list_url": _list_url(
+                request, "issuer:accesslog-list", ACCESSLOG_FILTER_FIELDS
+            ),
+        },
+    )
 
 
 def accesslog_export(request):
@@ -259,6 +283,7 @@ def integritylog_list(request):
     qs = filter_integrity_logs(params=filters).select_related("document")
     choices = integritylog_filter_choices()
     query = build_filter_query(filters)
+    page_obj = _paginate(request, qs)
     export_url = reverse("issuer:integritylog-export")
     if query:
         export_url = f"{export_url}?{query}"
@@ -266,9 +291,10 @@ def integritylog_list(request):
         request,
         "issuer/manage/integritylog_list.html",
         {
-            "page_obj": _paginate(request, qs),
+            "page_obj": page_obj,
             "filters": filters,
             "filter_query": query,
+            "detail_query": build_filter_query(filters, page=page_obj.number),
             "export_url": export_url,
             "clear_url": reverse("issuer:integritylog-list"),
             "issue_types": choices["issue_types"],
@@ -280,7 +306,16 @@ def integritylog_list(request):
 
 def integritylog_detail(request, pk):
     obj = get_object_or_404(IntegrityLog.objects.select_related("document"), pk=pk)
-    return render(request, "issuer/manage/integritylog_detail.html", {"object": obj})
+    return render(
+        request,
+        "issuer/manage/integritylog_detail.html",
+        {
+            "object": obj,
+            "list_url": _list_url(
+                request, "issuer:integritylog-list", INTEGRITYLOG_FILTER_FIELDS
+            ),
+        },
+    )
 
 
 def integritylog_export(request):

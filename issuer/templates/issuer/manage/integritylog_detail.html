@@ -4,7 +4,7 @@
   <h1>Integrity Log #{{ object.id }}</h1>
   <p class="sub">{{ object.issue_type }}</p>
   <div class="actions">
-    <a class="btn btn-outline" href="{% url 'issuer:integritylog-list' %}">Back to list</a>
+    <a class="btn btn-outline" href="{{ list_url }}">Back to list</a>
   </div>
   <div class="panel">
     <dl class="detail-grid">

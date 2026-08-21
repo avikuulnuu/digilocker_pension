@@ -40,6 +40,13 @@ from issuer.log_safety import safe_failure_reason
 logger = logging.getLogger("issuer")
 
 
+def health_view(request):
+    """Return a minimal process-liveness response."""
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    return HttpResponse("hello, im alive", content_type="text/plain")
+
+
 def _get_client_ip(request):
     """Extract client IP, respecting X-Forwarded-For behind a reverse proxy."""
     xff = request.META.get("HTTP_X_FORWARDED_FOR")
