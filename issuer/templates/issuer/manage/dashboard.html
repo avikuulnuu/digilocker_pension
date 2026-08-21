@@ -11,9 +11,9 @@
       <div class="hint">Successful API responses (access log status = 1)</div>
     </div>
     <div class="stat-card danger">
-      <div class="value">{{ stats.access_errors }}</div>
-      <div class="label">Access errors</div>
-      <div class="hint">Failed or rejected API requests</div>
+      <div class="value">{{ stats.service_failures }}</div>
+      <div class="label">Service failures</div>
+      <div class="hint">File, integrity, disabled-access, or internal failures</div>
     </div>
     <div class="stat-card danger">
       <div class="value">{{ stats.integrity_failures }}</div>
@@ -30,17 +30,12 @@
       <div class="label">Served today</div>
     </div>
     <div class="stat-card danger">
-      <div class="value">{{ stats.access_errors_today }}</div>
-      <div class="label">Access errors today</div>
+      <div class="value">{{ stats.service_failures_today }}</div>
+      <div class="label">Service failures today</div>
     </div>
     <div class="stat-card warn">
       <div class="value">{{ stats.integrity_failures_today }}</div>
       <div class="label">Integrity issues today</div>
-    </div>
-    <div class="stat-card warn">
-      <div class="value">{{ stats.documents_missing_file }}</div>
-      <div class="label">Missing files</div>
-      <div class="hint">Documents marked file_exists = false</div>
     </div>
   </div>
 
@@ -68,6 +63,7 @@
             <th>Time</th>
             <th>Txn</th>
             <th>Status</th>
+            <th>Outcome</th>
             <th></th>
           </tr>
         </thead>
@@ -76,17 +72,12 @@
           <tr>
             <td>{{ log.created_at|date:"m-d H:i" }}</td>
             <td>{{ log.txn_id|truncatechars:16|default:"—" }}</td>
-            <td>
-              {% if log.response_status == 1 %}
-                <span class="badge-ok">OK</span>
-              {% else %}
-                <span class="badge-err">{{ log.response_status }}</span>
-              {% endif %}
-            </td>
+            <td>{% include "issuer/manage/_response_status.html" with value=log.response_status %}</td>
+            <td>{{ log.get_outcome_class_display }}</td>
             <td><a href="{% url 'issuer:accesslog-detail' log.pk %}">View</a></td>
           </tr>
           {% empty %}
-          <tr><td colspan="4">No access logs yet.</td></tr>
+          <tr><td colspan="5">No access logs yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>

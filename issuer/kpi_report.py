@@ -1,17 +1,19 @@
 """KPI metrics for the management portal report."""
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time
 from io import StringIO
 
 import csv
 
 from django.db.models import Avg, Count, Q
+from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
 from issuer.models import AccessLog, Document, IntegrityLog
 
 MAX_KPI_RANGE_DAYS = 730  # ~2 years
 KPI_MIN_DATE = date(2026, 1, 1)
+DOCUMENT_COHORT_MIN_DATE = date(2026, 7, 1)
 
 
 def _clamp_to_min_date(date_from: date, date_to: date) -> tuple[date, date]:
@@ -24,18 +26,15 @@ def _clamp_to_min_date(date_from: date, date_to: date) -> tuple[date, date]:
     return date_from, date_to
 
 
-def previous_month_range(today: date | None = None) -> tuple[date, date]:
-    """First and last day of the calendar month before today."""
+def default_report_range(today: date | None = None) -> tuple[date, date]:
+    """Available KPI history from January 2026 through today."""
     today = today or timezone.localdate()
-    first_this_month = today.replace(day=1)
-    last_day_prev = first_this_month - timedelta(days=1)
-    first_day_prev = last_day_prev.replace(day=1)
-    return _clamp_to_min_date(first_day_prev, last_day_prev)
+    return _clamp_to_min_date(KPI_MIN_DATE, today)
 
 
 def parse_period(date_from_str: str, date_to_str: str) -> tuple[date, date, str | None]:
     """Parse and validate a date range. Returns (from, to, error_message)."""
-    default_from, default_to = previous_month_range()
+    default_from, default_to = default_report_range()
     if not date_from_str:
         date_from = default_from
     else:
@@ -98,12 +97,13 @@ def _display_text(value) -> str:
 
 
 HIGHLIGHT_METRICS = {
-    "Total documents",
-    "Total requests",
-    "Success rate (%)",
-    "Failed requests",
+    "Total document records",
+    "Logged Pull URI attempts",
+    "Documents served",
+    "Operational success rate (%)",
+    "Service failures",
     "Total integrity events",
-    "New documents created",
+    "Document records added",
 }
 
 
@@ -118,15 +118,51 @@ def _extract_highlights(summary_rows: list[tuple]) -> list[dict]:
                     "section": section,
                     "variant": (
                         "danger"
-                        if metric in ("Failed requests", "Total integrity events")
+                        if metric in ("Service failures", "Total integrity events")
                         and str(value) not in ("0", "0.0", EMPTY_VALUE, "n/a")
                         else "success"
-                        if metric in ("Success rate (%)", "Successful requests")
+                        if metric in ("Operational success rate (%)", "Documents served")
                         else "info"
                     ),
                 }
             )
     return highlights
+
+
+def access_outcome_counts(access_logs) -> dict:
+    """Aggregate protocol and operational outcomes for an AccessLog queryset."""
+    counts = access_logs.aggregate(
+        total=Count("id"),
+        documents_served=Count("id", filter=Q(response_status=1)),
+        handled=Count(
+            "id",
+            filter=Q(outcome_class=AccessLog.OutcomeClass.HANDLED),
+        ),
+        service_failures=Count(
+            "id",
+            filter=Q(outcome_class=AccessLog.OutcomeClass.SERVICE_FAILURE),
+        ),
+        rejected=Count(
+            "id",
+            filter=Q(outcome_class=AccessLog.OutcomeClass.REJECTED),
+        ),
+        pending=Count(
+            "id",
+            filter=Q(outcome_class=AccessLog.OutcomeClass.PENDING),
+        ),
+        unclassified=Count(
+            "id",
+            filter=Q(
+                outcome_class=AccessLog.OutcomeClass.LEGACY_UNCLASSIFIED
+            ),
+        ),
+    )
+    operational_total = counts["handled"] + counts["service_failures"]
+    counts["operational_success_rate"] = _pct(
+        counts["handled"],
+        operational_total,
+    )
+    return counts
 
 
 def build_kpi_report(date_from: date, date_to: date) -> dict:
@@ -139,10 +175,22 @@ def build_kpi_report(date_from: date, date_to: date) -> dict:
     docs_created_in_period = Document.objects.filter(
         created_at__gte=start, created_at__lte=end
     )
+    cohort_from = max(date_from, DOCUMENT_COHORT_MIN_DATE)
+    document_additions_by_month = []
+    if cohort_from <= date_to:
+        cohort_start, _ = _period_bounds(cohort_from, date_to)
+        document_additions_by_month = list(
+            Document.objects.filter(
+                created_at__gte=cohort_start,
+                created_at__lte=end,
+            )
+            .annotate(month=TruncMonth("created_at"))
+            .values("month")
+            .annotate(count=Count("id"))
+            .order_by("month")
+        )
 
-    access_total = access_in_period.count()
-    access_success = access_in_period.filter(response_status=1).count()
-    access_errors = access_total - access_success
+    outcome_counts = access_outcome_counts(access_in_period)
     access_with_err_msg = access_in_period.exclude(error_message="").count()
     avg_ms_all = access_in_period.aggregate(v=Avg("processing_time_ms"))["v"]
     avg_ms_ok = access_in_period.filter(response_status=1).aggregate(
@@ -157,7 +205,7 @@ def build_kpi_report(date_from: date, date_to: date) -> dict:
         ("Report", "Period", f"{date_from} to {date_to}", "Inclusive"),
         ("Report", "Generated at", generated_at.isoformat(), ""),
         ("", "", "", ""),
-        ("Document registry (current inventory)", "Total documents", Document.objects.count(), "All time"),
+        ("Document registry (current inventory)", "Total document records", Document.objects.count(), "All time"),
         (
             "Document registry (current inventory)",
             "Active documents",
@@ -166,34 +214,46 @@ def build_kpi_report(date_from: date, date_to: date) -> dict:
         ),
         (
             "Documents (in period)",
-            "New documents created",
+            "Document records added",
             docs_created_in_period.count(),
-            f"created_at in {date_from}..{date_to}",
+            "records first inserted during the selected period",
         ),
         ("", "", "", ""),
         (
             "API access (in period)",
-            "Total requests",
-            access_total,
-            "access_logs in period",
+            "Logged Pull URI attempts",
+            outcome_counts["total"],
+            "POST requests recorded by the Pull URI view",
         ),
         (
             "API access (in period)",
-            "Successful requests",
-            access_success,
-            "response_status=1",
+            "Documents served",
+            outcome_counts["documents_served"],
+            "document-bearing responses (response_status=1)",
         ),
         (
             "API access (in period)",
-            "Failed requests",
-            access_errors,
-            "response_status != 1",
+            "Handled outcomes",
+            outcome_counts["handled"],
+            "expected business outcomes, including valid no-record responses",
         ),
         (
             "API access (in period)",
-            "Success rate (%)",
-            _pct(access_success, access_total),
-            "",
+            "Service failures",
+            outcome_counts["service_failures"],
+            "file, integrity, disabled-access, or internal failures",
+        ),
+        (
+            "API access (in period)",
+            "Operational success rate (%)",
+            outcome_counts["operational_success_rate"],
+            "handled / (handled + service failures)",
+        ),
+        (
+            "API access (in period)",
+            "Rejected requests",
+            outcome_counts["rejected"],
+            "malformed, unauthenticated, or missing required identifier",
         ),
         (
             "API access (in period)",
@@ -218,9 +278,9 @@ def build_kpi_report(date_from: date, date_to: date) -> dict:
         ),
         (
             "API access (in period)",
-            "Avg processing time (ms) - success",
+            "Avg processing time (ms) - documents served",
             f"{avg_ms_ok:.1f}" if avg_ms_ok is not None else EMPTY_VALUE,
-            "successful requests only",
+            "document-bearing responses only",
         ),
         (
             "API access (in period)",
@@ -254,11 +314,22 @@ def build_kpi_report(date_from: date, date_to: date) -> dict:
         access_in_period.values("document_type")
         .annotate(
             total=Count("id"),
-            success=Count("id", filter=Q(response_status=1)),
+            served=Count("id", filter=Q(response_status=1)),
+            handled=Count(
+                "id",
+                filter=Q(outcome_class=AccessLog.OutcomeClass.HANDLED),
+            ),
+            service_failures=Count(
+                "id",
+                filter=Q(outcome_class=AccessLog.OutcomeClass.SERVICE_FAILURE),
+            ),
+            rejected=Count(
+                "id",
+                filter=Q(outcome_class=AccessLog.OutcomeClass.REJECTED),
+            ),
         )
         .order_by("-total")
     ):
-        row["failed"] = row["total"] - row["success"]
         access_by_type.append(row)
 
     integrity_by_issue = list(
@@ -281,10 +352,12 @@ def build_kpi_report(date_from: date, date_to: date) -> dict:
     return {
         "date_from": date_from,
         "date_to": date_to,
+        "documents_served": outcome_counts["documents_served"],
         "generated_at": generated_at,
         "summary_rows": summary_rows,
         "highlights": _extract_highlights(summary_rows),
         "access_by_type": access_by_type,
+        "document_additions_by_month": document_additions_by_month,
         "integrity_by_issue": integrity_by_issue,
         "integrity_by_action": integrity_by_action,
     }
@@ -297,7 +370,7 @@ def kpi_definitions() -> list[dict]:
             "category": "Document registry",
             "scope": "Current snapshot",
             "metrics": [
-                "Total documents registered",
+                "Total document records",
                 "Active documents",
             ],
         },
@@ -305,15 +378,18 @@ def kpi_definitions() -> list[dict]:
             "category": "Document onboarding",
             "scope": "Selected period",
             "metrics": [
-                "New documents created in period",
+                "Document records first inserted in period",
+                "Monthly document records added from July 2026",
             ],
         },
         {
-            "category": "API access (Pull URI & fetch)",
+            "category": "API access (Pull URI)",
             "scope": "Selected period",
             "metrics": [
-                "Total DigiLocker API requests (access logs)",
-                "Successful vs failed requests and success rate",
+                "Logged Pull URI attempts",
+                "Documents served (document-bearing responses)",
+                "Handled outcomes vs service failures and operational success rate",
+                "Rejected requests",
                 "Requests with recorded error messages",
                 "Unique authorization numbers and transaction IDs",
                 "Average response processing time (ms)",
@@ -347,14 +423,34 @@ def export_kpi_csv(report: dict) -> str:
         writer.writerow([_display_text(cell) for cell in row])
 
     writer.writerow([])
-    writer.writerow(["Access logs by document type (in period)"])
-    writer.writerow(["Document type", "Total requests", "Successful", "Failed"])
+    writer.writerow(["Document records added by month (from July 2026)"])
+    writer.writerow(["Month", "Records added"])
+    for row in report["document_additions_by_month"]:
+        writer.writerow([row["month"].strftime("%B %Y"), row["count"]])
+
+    writer.writerow([])
+    writer.writerow(["Pull URI outcomes by document type (in period)"])
+    writer.writerow(
+        [
+            "Document type",
+            "Logged attempts",
+            "Documents served",
+            "Handled outcomes",
+            "Service failures",
+            "Rejected requests",
+        ]
+    )
     for row in report["access_by_type"]:
         doc_type = row["document_type"] or "(blank)"
-        total = row["total"]
-        success = row["success"]
         writer.writerow(
-            [_display_text(doc_type), total, success, total - success]
+            [
+                _display_text(doc_type),
+                row["total"],
+                row["served"],
+                row["handled"],
+                row["service_failures"],
+                row["rejected"],
+            ]
         )
 
     writer.writerow([])

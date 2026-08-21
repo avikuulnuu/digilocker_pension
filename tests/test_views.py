@@ -93,7 +93,10 @@ class PullURIViewTest(TestCase):
         self.assertIn(b"<DocContent>", response.content)
         self.assertIn(b"<DataContent>", response.content)
 
-        self.assertTrue(AccessLog.objects.filter(txn_id="test-txn").exists())
+        access_log = AccessLog.objects.get(txn_id="test-txn")
+        self.assertEqual(access_log.outcome_class, AccessLog.OutcomeClass.HANDLED)
+        self.assertEqual(access_log.reason_code, "DOCUMENT_SERVED")
+        self.assertEqual(access_log.http_status_code, 200)
 
         self.doc.refresh_from_db()
         self.assertEqual(self.doc.access_count, 1)
@@ -264,6 +267,9 @@ class PullURIViewTest(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Status="0"', response.content)
+        access_log = AccessLog.objects.get(txn_id="test-txn-missing-auth")
+        self.assertEqual(access_log.outcome_class, AccessLog.OutcomeClass.HANDLED)
+        self.assertEqual(access_log.reason_code, "AUTH_NOT_FOUND")
         self.doc.refresh_from_db()
         self.assertEqual(self.doc.access_count, 0)
         self.assertIsNone(self.doc.last_accessed_at)
@@ -316,10 +322,107 @@ class PullURIViewTest(TestCase):
             content_type="application/xml",
         )
         self.assertEqual(response.status_code, 401)
+        access_log = AccessLog.objects.get(txn_id="1")
+        self.assertEqual(access_log.outcome_class, AccessLog.OutcomeClass.REJECTED)
+        self.assertEqual(access_log.processing_stage, "auth")
+        self.assertEqual(access_log.http_status_code, 401)
 
     def test_pull_uri_get_not_allowed(self):
         response = self.client.get("/api/pulluri")
         self.assertEqual(response.status_code, 405)
+        self.assertFalse(AccessLog.objects.exists())
+
+    @override_settings(DIGILOCKER_INTEGRITY_MODE="WARN")
+    def test_warn_integrity_issue_is_served_and_classified_as_service_failure(self):
+        self.doc.file_checksum = "0" * 64
+        self.doc.save(update_fields=["file_checksum"])
+        ts = timezone.now().isoformat()
+        keyhash = hashlib.sha256(
+            (settings.DIGILOCKER_API_KEY + ts).encode()
+        ).hexdigest()
+        body = (
+            f'<PullURIRequest xmlns="http://tempuri.org/" ver="3.0"'
+            f' ts="{ts}" txn="warn-integrity-txn"'
+            f' orgId="{settings.DIGILOCKER_ISSUER_ID}"'
+            f' keyhash="{keyhash}" format="both">'
+            f"<DocDetails><DocType>PECER</DocType>"
+            f"<DigiLockerId>dl-test</DigiLockerId>"
+            f"<FullName>Sunil Kumar</FullName>"
+            f"<AUTHN>AUTH100</AUTHN></DocDetails></PullURIRequest>"
+        ).encode()
+
+        response = self.client.post(
+            "/api/pulluri",
+            data=body,
+            content_type="application/xml",
+            HTTP_X_DIGILOCKER_HMAC=self._make_signed_request(body),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Status="1"', response.content)
+        access_log = AccessLog.objects.get(txn_id="warn-integrity-txn")
+        self.assertEqual(
+            access_log.outcome_class,
+            AccessLog.OutcomeClass.SERVICE_FAILURE,
+        )
+        self.assertEqual(access_log.reason_code, "CHECKSUM_MISMATCH")
+        self.assertEqual(access_log.response_status, 1)
+        self.doc.refresh_from_db()
+        self.assertEqual(self.doc.access_count, 1)
+
+    def test_digilocker_disabled_document_is_service_failure(self):
+        self.doc.digilocker_enabled = False
+        self.doc.save(update_fields=["digilocker_enabled"])
+        response = self._post_for_document("disabled-txn")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Status="0"', response.content)
+        access_log = AccessLog.objects.get(txn_id="disabled-txn")
+        self.assertEqual(
+            access_log.outcome_class,
+            AccessLog.OutcomeClass.SERVICE_FAILURE,
+        )
+        self.assertEqual(access_log.reason_code, "DIGILOCKER_DISABLED")
+
+    @override_settings(DIGILOCKER_INTEGRITY_MODE="STRICT")
+    def test_strict_integrity_issue_is_blocked_service_failure(self):
+        self.doc.file_checksum = "0" * 64
+        self.doc.save(update_fields=["file_checksum"])
+        response = self._post_for_document("strict-integrity-txn")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Status="0"', response.content)
+        access_log = AccessLog.objects.get(txn_id="strict-integrity-txn")
+        self.assertEqual(
+            access_log.outcome_class,
+            AccessLog.OutcomeClass.SERVICE_FAILURE,
+        )
+        self.assertEqual(access_log.reason_code, "CHECKSUM_MISMATCH")
+        self.assertEqual(access_log.response_status, 0)
+        self.doc.refresh_from_db()
+        self.assertEqual(self.doc.access_count, 0)
+
+    def _post_for_document(self, txn):
+        ts = timezone.now().isoformat()
+        keyhash = hashlib.sha256(
+            (settings.DIGILOCKER_API_KEY + ts).encode()
+        ).hexdigest()
+        body = (
+            f'<PullURIRequest xmlns="http://tempuri.org/" ver="3.0"'
+            f' ts="{ts}" txn="{txn}"'
+            f' orgId="{settings.DIGILOCKER_ISSUER_ID}"'
+            f' keyhash="{keyhash}" format="both">'
+            f"<DocDetails><DocType>PECER</DocType>"
+            f"<DigiLockerId>dl-test</DigiLockerId>"
+            f"<FullName>Sunil Kumar</FullName>"
+            f"<AUTHN>AUTH100</AUTHN></DocDetails></PullURIRequest>"
+        ).encode()
+        return self.client.post(
+            "/api/pulluri",
+            data=body,
+            content_type="application/xml",
+            HTTP_X_DIGILOCKER_HMAC=self._make_signed_request(body),
+        )
 
     def test_legacy_pull_doc_endpoints_return_404(self):
         for path in ("/api/pulldoc", "/api/pull-doc"):

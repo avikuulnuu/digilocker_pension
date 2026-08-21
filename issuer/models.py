@@ -95,6 +95,13 @@ class Document(models.Model):
 class AccessLog(models.Model):
     """Audit log for every DigiLocker API request."""
 
+    class OutcomeClass(models.TextChoices):
+        HANDLED = "HANDLED", "Handled outcome"
+        SERVICE_FAILURE = "SERVICE_FAILURE", "Service failure"
+        REJECTED = "REJECTED", "Rejected request"
+        PENDING = "PENDING", "Pending"
+        LEGACY_UNCLASSIFIED = "LEGACY_UNCLASSIFIED", "Legacy or unclassified"
+
     document = models.ForeignKey(
         Document, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -108,6 +115,14 @@ class AccessLog(models.Model):
     file_checksum = models.CharField(max_length=64, blank=True, default="")
     user_agent = models.TextField(blank=True, default="")
     response_status = models.SmallIntegerField(default=0)
+    outcome_class = models.CharField(
+        max_length=20,
+        choices=OutcomeClass.choices,
+        default=OutcomeClass.LEGACY_UNCLASSIFIED,
+    )
+    reason_code = models.CharField(max_length=50, blank=True, default="")
+    processing_stage = models.CharField(max_length=20, blank=True, default="")
+    http_status_code = models.PositiveSmallIntegerField(null=True, blank=True)
     error_message = models.TextField(blank=True, default="")
     processing_time_ms = models.IntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

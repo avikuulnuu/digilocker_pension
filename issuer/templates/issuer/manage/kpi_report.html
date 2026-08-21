@@ -2,7 +2,7 @@
 {% block title %}KPI Report{% endblock %}
 {% block content %}
   <h1>KPI Report</h1>
-  <p class="sub">Operational metrics for the selected period. Default range is the previous calendar month.</p>
+  <p class="sub">Operational metrics for the selected period. Default range is January 2026 through today.</p>
 
   <div class="panel kpi-filters-panel">
     <form method="get">
@@ -16,7 +16,7 @@
           <input id="date_to" type="date" name="date_to" value="{{ date_to }}" min="{{ min_date }}" />
         </div>
         <button type="submit" class="btn">Search</button>
-        <a class="btn btn-outline" href="{% url 'issuer:kpi-report' %}">Reset to defaults</a>
+        <a class="btn btn-outline" href="{% url 'issuer:kpi-report' %}">Full period</a>
       </div>
       <p class="sub kpi-filter-hint">
         Default: {{ default_from }} – {{ default_to }} · Earliest date: {{ min_date }}
@@ -31,9 +31,13 @@
   <div class="panel kpi-preview-panel">
     <div class="kpi-preview-header">
       <div>
-        <h2>Report results</h2>
+        <h2>{{ report.documents_served }} document{{ report.documents_served|pluralize }} served</h2>
+        <div class="kpi-report-period">
+          <span class="kpi-report-period-label">Reporting period</span>
+          <strong>{{ report.date_from|date:"F j, Y" }} to {{ report.date_to|date:"F j, Y" }}</strong>
+        </div>
         <p class="sub kpi-preview-meta">
-          {{ report.date_from }} to {{ report.date_to }} · Generated {{ report.generated_at|date:"Y-m-d H:i" }}
+          Generated {{ report.generated_at|date:"j F Y, g:i A" }}
         </p>
       </div>
       {% if download_url %}
@@ -73,18 +77,39 @@
       </table>
     </div>
 
-    {% if report.access_by_type %}
-    <h3 class="kpi-section-title">Access logs by document type</h3>
+    {% if report.document_additions_by_month %}
+    <h3 class="kpi-section-title">Document records added by month</h3>
     <div class="kpi-table-scroll kpi-table-scroll--short">
       <table>
-        <thead><tr><th>Type</th><th>Total</th><th>Success</th><th>Failed</th></tr></thead>
+        <thead><tr><th>Month</th><th>Records added</th></tr></thead>
+        <tbody>
+          {% for row in report.document_additions_by_month %}
+          <tr><td>{{ row.month|date:"F Y" }}</td><td>{{ row.count }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if report.access_by_type %}
+    <h3 class="kpi-section-title">Pull URI outcomes by document type</h3>
+    <div class="kpi-table-scroll kpi-table-scroll--short">
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th><th>Attempts</th><th>Served</th><th>Handled</th>
+            <th>Service failures</th><th>Rejected</th>
+          </tr>
+        </thead>
         <tbody>
           {% for row in report.access_by_type %}
           <tr>
             <td>{{ row.document_type|default:"(blank)" }}</td>
             <td>{{ row.total }}</td>
-            <td>{{ row.success }}</td>
-            <td>{{ row.failed }}</td>
+            <td>{{ row.served }}</td>
+            <td>{{ row.handled }}</td>
+            <td>{{ row.service_failures }}</td>
+            <td>{{ row.rejected }}</td>
           </tr>
           {% endfor %}
         </tbody>

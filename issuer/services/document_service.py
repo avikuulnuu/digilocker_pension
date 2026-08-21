@@ -33,19 +33,30 @@ DOC_TYPE_DISPLAY_NAMES = {
 class DocumentNotFoundError(Exception):
     """Document could not be resolved for Pull URI lookup."""
 
-    def __init__(self, message, *, reason_code=""):
+    def __init__(self, message, *, reason_code="", document=None):
         super().__init__(message)
         self.reason_code = reason_code
+        self.document = document
 
 
 def _fail_lookup(reason_code, message, *, txn="", **context):
+    document = context.pop("document", None)
     stage_failed("lookup", reason_code, reason_code=reason_code, txn=txn, **context)
-    raise DocumentNotFoundError(message, reason_code=reason_code)
+    raise DocumentNotFoundError(
+        message,
+        reason_code=reason_code,
+        document=document,
+    )
 
 
 def _fail_file_unavailable(reason_code, message, *, txn="", **context):
+    document = context.pop("document", None)
     stage_failed("file_read", reason_code, reason_code=reason_code, txn=txn, **context)
-    raise FileNotAvailableError(message)
+    raise FileNotAvailableError(
+        message,
+        document=document,
+        reason_code=reason_code,
+    )
 
 
 def lookup_document(request_data: PullURIRequestData, *, txn: str = "") -> Document:
@@ -105,6 +116,7 @@ def lookup_document(request_data: PullURIRequestData, *, txn: str = "") -> Docum
                 "but is marked inactive (is_active=False)"
             ),
             txn=txn,
+            document=doc,
             document_id=doc.pk,
             doc_type=doc_type,
             authorization_number=authorization_number,
@@ -118,6 +130,7 @@ def lookup_document(request_data: PullURIRequestData, *, txn: str = "") -> Docum
                 "but DigiLocker access is disabled (digilocker_enabled=False)"
             ),
             txn=txn,
+            document=doc,
             document_id=doc.pk,
             doc_type=doc_type,
             authorization_number=authorization_number,
@@ -131,6 +144,7 @@ def lookup_document(request_data: PullURIRequestData, *, txn: str = "") -> Docum
                 "file_name stored in the database"
             ),
             txn=txn,
+            document=doc,
             document_id=doc.pk,
             authorization_number=authorization_number,
         )
@@ -146,6 +160,7 @@ def lookup_document(request_data: PullURIRequestData, *, txn: str = "") -> Docum
                 f"Primary expected path: '{expected}' (file_exists={doc.file_exists})"
             ),
             txn=txn,
+            document=doc,
             document_id=doc.pk,
             file_name=doc.file_name,
             expected_path=expected,
@@ -190,7 +205,11 @@ def process_pull_uri(
     doc = lookup_document(request_data, txn=txn)
 
     # 2. Identity validation
-    validate_identity(doc, request_data.full_name, request_data.dob)
+    try:
+        validate_identity(doc, request_data.full_name, request_data.dob)
+    except IdentityMismatchError as exc:
+        exc.document = doc
+        raise
     stage_ok("identity", "Identity validated", txn=txn, document_id=doc.pk)
 
     # 3. Ensure URI (lazy generation)
@@ -198,7 +217,7 @@ def process_pull_uri(
     stage_ok("uri", "URI ready", txn=txn, document_id=doc.pk, uri=uri)
 
     # 4. File read + integrity
-    file_bytes = read_file_bytes(
+    file_result = read_file_bytes(
         doc,
         request_ip=request_ip,
         digilocker_txn=txn,
@@ -206,7 +225,7 @@ def process_pull_uri(
     )
 
     # 5. Encode
-    doc_content_b64 = base64.b64encode(file_bytes).decode("utf-8")
+    doc_content_b64 = base64.b64encode(file_result.content).decode("utf-8")
     metadata_xml = _build_metadata_xml(doc)
     data_content_b64 = base64.b64encode(metadata_xml.encode("utf-8")).decode("utf-8")
     stage_ok("encode", "Response payload encoded", txn=txn, document_id=doc.pk)
@@ -216,6 +235,7 @@ def process_pull_uri(
         "uri": uri,
         "doc_content_b64": doc_content_b64,
         "data_content_b64": data_content_b64,
+        "integrity_issue": file_result.integrity_issue,
     }
 
 

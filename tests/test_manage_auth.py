@@ -7,7 +7,7 @@ from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from issuer.models import Document
+from issuer.models import AccessLog, Document
 
 User = get_user_model()
 
@@ -127,3 +127,52 @@ class ManagePortalReadOnlyTest(TestCase):
                     405,
                     msg=f"{method.upper()} {url_name} should be read-only",
                 )
+
+
+@override_settings(CAPTCHA_TEST_MODE=True)
+class ManagePortalCopyTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="portal_copy_user",
+            password="test-pass-123",
+        )
+        grant_manage_portal(self.user)
+        self.client.force_login(self.user)
+
+    def test_list_pages_show_meaningful_subheaders(self):
+        expected_copy = {
+            "issuer:document-list": "All existing pension documents.",
+            "issuer:accesslog-list": "All access attempts from DigiLocker.",
+            "issuer:integritylog-list": "Logs of all document integrity events.",
+        }
+
+        for url_name, text in expected_copy.items():
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name))
+                self.assertContains(response, text)
+
+    def test_success_status_has_explanation_on_access_log_pages(self):
+        access_log = AccessLog.objects.create(response_status=1, txn_id="txn-success")
+
+        for url in (
+            reverse("issuer:manage-hub"),
+            reverse("issuer:accesslog-list"),
+            reverse("issuer:accesslog-detail", kwargs={"pk": access_log.pk}),
+        ):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertContains(response, "1 (Successfully responded)")
+
+    def test_status_zero_detail_remains_raw_with_error_message(self):
+        access_log = AccessLog.objects.create(
+            response_status=0,
+            txn_id="txn-not-served",
+            error_message="Invalid request value",
+        )
+
+        response = self.client.get(
+            reverse("issuer:accesslog-detail", kwargs={"pk": access_log.pk})
+        )
+
+        self.assertContains(response, "<dt>Response status</dt><dd>0</dd>", html=True)
+        self.assertContains(response, "<dt>Error message</dt><dd>Invalid request value</dd>", html=True)

@@ -3,6 +3,7 @@
 import hashlib
 import logging
 import os
+from dataclasses import dataclass
 
 from django.conf import settings
 from django.utils import timezone
@@ -17,11 +18,23 @@ CHUNK_SIZE = 8192
 
 
 class FileNotAvailableError(Exception):
-    pass
+    def __init__(self, message, *, document=None, reason_code=""):
+        super().__init__(message)
+        self.document = document
+        self.reason_code = reason_code
 
 
 class IntegrityCheckError(Exception):
-    pass
+    def __init__(self, message, *, document=None, reason_code=""):
+        super().__init__(message)
+        self.document = document
+        self.reason_code = reason_code
+
+
+@dataclass(frozen=True)
+class FileReadResult:
+    content: bytes
+    integrity_issue: str = ""
 
 
 def storage_base_for_document_type(document_type: str) -> str:
@@ -166,10 +179,10 @@ def compute_checksum(file_path: str) -> str:
     return sha.hexdigest()
 
 
-def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digilocker_id=None) -> bytes:
+def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digilocker_id=None) -> FileReadResult:
     """Read document file, performing integrity checks per configured mode.
 
-    Returns file content bytes on success.
+    Returns file content and any non-blocking integrity issue on success.
     Raises FileNotAvailableError or IntegrityCheckError in STRICT mode.
     """
     full_path = find_readable_path(doc)
@@ -195,7 +208,11 @@ def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digi
                 "digilocker_id": digilocker_id,
             }
         )
-        raise FileNotAvailableError(f"File not found: {doc.file_name}")
+        raise FileNotAvailableError(
+            f"File not found: {doc.file_name}",
+            document=doc,
+            reason_code="FILE_MISSING_ON_DISK",
+        )
 
     # Check size limit
     file_size = os.path.getsize(full_path)
@@ -209,7 +226,9 @@ def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digi
             max_bytes=max_bytes,
         )
         raise FileNotAvailableError(
-            f"File exceeds {settings.DIGILOCKER_MAX_FILE_SIZE_MB}MB limit"
+            f"File exceeds {settings.DIGILOCKER_MAX_FILE_SIZE_MB}MB limit",
+            document=doc,
+            reason_code="FILE_TOO_LARGE",
         )
 
     # Read content
@@ -217,6 +236,7 @@ def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digi
         content = f.read()
 
     # Integrity check
+    integrity_issue = ""
     if doc.file_checksum:
         calculated = compute_checksum(full_path)
         if calculated != doc.file_checksum:
@@ -241,7 +261,12 @@ def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digi
                 mode=mode,
             )
             if mode == "STRICT":
-                raise IntegrityCheckError("Document integrity check failed")
+                raise IntegrityCheckError(
+                    "Document integrity check failed",
+                    document=doc,
+                    reason_code="CHECKSUM_MISMATCH",
+                )
+            integrity_issue = "CHECKSUM_MISMATCH"
 
     # Update last-checked timestamp
     doc.file_last_checked_at = timezone.now()
@@ -256,7 +281,7 @@ def read_file_bytes(doc: Document, *, request_ip=None, digilocker_txn=None, digi
         file_size=file_size,
         digilocker_txn=digilocker_txn,
     )
-    return content
+    return FileReadResult(content=content, integrity_issue=integrity_issue)
 
 
 def _log_integrity(doc, file_path, issue_type, stored, calculated, mode, extra_context=None):

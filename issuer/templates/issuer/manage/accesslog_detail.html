@@ -19,7 +19,11 @@
       <dt>File path</dt><dd>{{ object.file_path }}</dd>
       <dt>File checksum</dt><dd>{{ object.file_checksum }}</dd>
       <dt>User agent</dt><dd>{{ object.user_agent }}</dd>
-      <dt>Response status</dt><dd>{{ object.response_status }}</dd>
+      <dt>Response status</dt><dd>{% include "issuer/manage/_response_status.html" with value=object.response_status %}</dd>
+      <dt>Operational outcome</dt><dd>{{ object.get_outcome_class_display }}</dd>
+      <dt>Reason code</dt><dd>{{ object.reason_code|default:"—" }}</dd>
+      <dt>Processing stage</dt><dd>{{ object.processing_stage|default:"—" }}</dd>
+      <dt>HTTP status</dt><dd>{{ object.http_status_code|default:"—" }}</dd>
       <dt>Error message</dt><dd>{{ object.error_message|default:"—" }}</dd>
       <dt>Processing time (ms)</dt><dd>{{ object.processing_time_ms|default:"—" }}</dd>
       <dt>Created at</dt><dd>{{ object.created_at }}</dd>

@@ -16,11 +16,12 @@ from django.views.decorators.http import require_http_methods
 
 from issuer.kpi_report import (
     KPI_MIN_DATE,
+    access_outcome_counts,
     build_kpi_report,
+    default_report_range,
     export_kpi_csv,
     kpi_definitions,
     parse_period,
-    previous_month_range,
 )
 from issuer.manage_filters import (
     ACCESSLOG_FILTER_FIELDS,
@@ -77,19 +78,20 @@ def _get_dashboard_stats():
     integrity_logs = IntegrityLog.objects.all()
     documents = Document.objects.all()
 
-    served = access_logs.filter(response_status=1)
-    errors = access_logs.exclude(response_status=1)
+    access_counts = access_outcome_counts(access_logs)
+    today_access_counts = access_outcome_counts(
+        access_logs.filter(created_at__date=today)
+    )
 
     return {
         "documents_total": documents.count(),
         "documents_active": documents.filter(is_active=True).count(),
         "documents_enabled": documents.filter(digilocker_enabled=True).count(),
-        "documents_missing_file": documents.filter(file_exists=False).count(),
-        "documents_served": served.count(),
-        "documents_served_today": served.filter(created_at__date=today).count(),
-        "access_errors": errors.count(),
-        "access_errors_today": errors.filter(created_at__date=today).count(),
-        "access_logs_total": access_logs.count(),
+        "documents_served": access_counts["documents_served"],
+        "documents_served_today": today_access_counts["documents_served"],
+        "service_failures": access_counts["service_failures"],
+        "service_failures_today": today_access_counts["service_failures"],
+        "access_logs_total": access_counts["total"],
         "integrity_failures": integrity_logs.count(),
         "integrity_failures_today": integrity_logs.filter(created_at__date=today).count(),
         "integrity_by_issue": list(
@@ -293,7 +295,7 @@ def integritylog_export(request):
 
 
 def kpi_report(request):
-    default_from, default_to = previous_month_range()
+    default_from, default_to = default_report_range()
     date_from_str = request.GET.get("date_from", "")
     date_to_str = request.GET.get("date_to", "")
     date_from, date_to, error = parse_period(date_from_str, date_to_str)

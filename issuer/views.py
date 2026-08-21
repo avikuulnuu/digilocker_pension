@@ -3,14 +3,14 @@
 import logging
 import time
 
-from django.db.models import F
 from django.http import HttpResponse, HttpResponseNotAllowed
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 
 from issuer.authentication import authenticate_request, AuthenticationError
-from issuer.models import AccessLog, Document
+from issuer.models import AccessLog
+from issuer.services.access_log_service import finalize_access_log, start_access_log
 from issuer.services.document_service import (
     DocumentNotFoundError,
     process_pull_uri,
@@ -79,6 +79,7 @@ def pull_uri_view(request):
         "request_ip": request_ip,
         "user_agent": request.META.get("HTTP_USER_AGENT", ""),
     }
+    access_log = start_access_log(**log_data)
     request_received(
         endpoint="pull-uri",
         request_ip=request_ip,
@@ -101,7 +102,17 @@ def pull_uri_view(request):
                 elapsed_ms=elapsed,
                 request_ip=request_ip,
             )
-            _log_access(log_data, None, 0, elapsed, str(exc))
+            finalize_access_log(
+                access_log,
+                data=log_data,
+                response_status=0,
+                outcome_class=AccessLog.OutcomeClass.REJECTED,
+                reason_code="MALFORMED_XML",
+                processing_stage="xml_parse",
+                http_status_code=400,
+                elapsed_ms=elapsed,
+                error_message=str(exc),
+            )
             return HttpResponse(
                 build_error_response(timestamp, txn),
                 content_type="application/xml",
@@ -150,7 +161,22 @@ def pull_uri_view(request):
         )
 
         elapsed = int((time.monotonic() - start_time) * 1000)
-        _log_access(log_data, result["doc"], 1, elapsed)
+        integrity_issue = result["integrity_issue"]
+        finalize_access_log(
+            access_log,
+            data=log_data,
+            document=result["doc"],
+            response_status=1,
+            outcome_class=(
+                AccessLog.OutcomeClass.SERVICE_FAILURE
+                if integrity_issue
+                else AccessLog.OutcomeClass.HANDLED
+            ),
+            reason_code=integrity_issue or "DOCUMENT_SERVED",
+            processing_stage="integrity" if integrity_issue else "complete",
+            http_status_code=200,
+            elapsed_ms=elapsed,
+        )
         retrieval_success(
             endpoint="pull-uri",
             txn=txn,
@@ -174,7 +200,18 @@ def pull_uri_view(request):
             elapsed_ms=elapsed,
             request_ip=request_ip,
         )
-        _log_access(log_data, None, 0, elapsed, str(exc))
+        finalize_access_log(
+            access_log,
+            data=log_data,
+            document=getattr(exc, "document", None),
+            response_status=0,
+            outcome_class=AccessLog.OutcomeClass.REJECTED,
+            reason_code="AUTHENTICATION_FAILED",
+            processing_stage="auth",
+            http_status_code=401,
+            elapsed_ms=elapsed,
+            error_message=str(exc),
+        )
         return HttpResponse(status=401)
 
     except DocumentNotFoundError as exc:
@@ -189,7 +226,26 @@ def pull_uri_view(request):
             doc_type=log_data.get("document_type"),
             authorization_number=log_data.get("authorization_number"),
         )
-        _log_access(log_data, None, 0, elapsed, str(exc))
+        reason_code = getattr(exc, "reason_code", "") or "LOOKUP_FAILED"
+        outcome_class = (
+            AccessLog.OutcomeClass.SERVICE_FAILURE
+            if reason_code == "DIGILOCKER_DISABLED"
+            else AccessLog.OutcomeClass.REJECTED
+            if reason_code == "MISSING_AUTHN"
+            else AccessLog.OutcomeClass.HANDLED
+        )
+        finalize_access_log(
+            access_log,
+            data=log_data,
+            document=getattr(exc, "document", None),
+            response_status=0,
+            outcome_class=outcome_class,
+            reason_code=reason_code,
+            processing_stage="lookup",
+            http_status_code=200,
+            elapsed_ms=elapsed,
+            error_message=str(exc),
+        )
         return HttpResponse(
             build_error_response(timestamp, txn),
             content_type="application/xml",
@@ -205,7 +261,18 @@ def pull_uri_view(request):
             txn=txn,
             elapsed_ms=elapsed,
         )
-        _log_access(log_data, None, 0, elapsed, str(exc))
+        finalize_access_log(
+            access_log,
+            data=log_data,
+            document=getattr(exc, "document", None),
+            response_status=0,
+            outcome_class=AccessLog.OutcomeClass.HANDLED,
+            reason_code="IDENTITY_MISMATCH",
+            processing_stage="identity",
+            http_status_code=200,
+            elapsed_ms=elapsed,
+            error_message=str(exc),
+        )
         return HttpResponse(
             build_error_response(timestamp, txn),
             content_type="application/xml",
@@ -221,7 +288,17 @@ def pull_uri_view(request):
             txn=txn,
             elapsed_ms=elapsed,
         )
-        _log_access(log_data, None, 0, elapsed, str(exc))
+        finalize_access_log(
+            access_log,
+            data=log_data,
+            response_status=0,
+            outcome_class=AccessLog.OutcomeClass.SERVICE_FAILURE,
+            reason_code=getattr(exc, "reason_code", "") or "FILE_UNAVAILABLE",
+            processing_stage="file_read",
+            http_status_code=200,
+            elapsed_ms=elapsed,
+            error_message=str(exc),
+        )
         return HttpResponse(
             build_error_response(timestamp, txn),
             content_type="application/xml",
@@ -237,7 +314,18 @@ def pull_uri_view(request):
             txn=txn,
             elapsed_ms=elapsed,
         )
-        _log_access(log_data, None, 0, elapsed, str(exc))
+        finalize_access_log(
+            access_log,
+            data=log_data,
+            document=getattr(exc, "document", None),
+            response_status=0,
+            outcome_class=AccessLog.OutcomeClass.SERVICE_FAILURE,
+            reason_code=getattr(exc, "reason_code", "") or "INTEGRITY_CHECK_FAILED",
+            processing_stage="integrity",
+            http_status_code=200,
+            elapsed_ms=elapsed,
+            error_message=str(exc),
+        )
         return HttpResponse(
             build_error_response(timestamp, txn),
             content_type="application/xml",
@@ -254,7 +342,17 @@ def pull_uri_view(request):
             txn=txn,
             elapsed_ms=elapsed,
         )
-        _log_access(log_data, None, 0, elapsed, "Internal error")
+        finalize_access_log(
+            access_log,
+            data=log_data,
+            response_status=0,
+            outcome_class=AccessLog.OutcomeClass.SERVICE_FAILURE,
+            reason_code="INTERNAL_ERROR",
+            processing_stage="internal",
+            http_status_code=500,
+            elapsed_ms=elapsed,
+            error_message="Internal error",
+        )
         return HttpResponse(
             build_error_response(timestamp, txn),
             content_type="application/xml",
@@ -279,35 +377,3 @@ def document_fetch_disabled_view(request, uri=""):
     )
 
 
-def _log_access(data: dict, doc, status: int, elapsed_ms: int, error: str = ""):
-    """Write an access log entry and update document access stats on success."""
-    try:
-        doc_type_val = data.get("document_type", "") or ""
-        if len(doc_type_val) > 30:
-            logger.warning(
-                "document_type length (%d) exceeds DB max (30)",
-                len(doc_type_val),
-            )
-            doc_type_val = doc_type_val[:30]
-        AccessLog.objects.create(
-            document=doc,
-            authorization_number=data.get("authorization_number", ""),
-            document_type=doc_type_val,
-            txn_id=data.get("txn_id", ""),
-            digilocker_id=data.get("digilocker_id", ""),
-            request_ip=data.get("request_ip"),
-            user_agent=data.get("user_agent", ""),
-            requested_mobile=data.get("requested_mobile") or (getattr(doc, "employee_mobile", None) if doc else None),
-            file_path=data.get("file_path") or (getattr(doc, "file_name", "") if doc else ""),
-            file_checksum=(data.get("file_checksum") or (getattr(doc, "file_checksum", "") if doc else "") or ""),
-            response_status=status,
-            error_message=error,
-            processing_time_ms=elapsed_ms,
-        )
-        if doc is not None and status == 1:
-            Document.objects.filter(pk=doc.pk).update(
-                access_count=F("access_count") + 1,
-                last_accessed_at=timezone.now(),
-            )
-    except Exception:
-        logger.exception("Failed to write access log")
